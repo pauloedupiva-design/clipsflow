@@ -719,9 +719,11 @@ async function trocarCodigoPorToken(code){
       return true;
     }
     console.warn('ML token erro:', JSON.stringify(d));
+    alert('Erro ML: ' + (d.message || d.error || 'Tente reconectar.'));
     return false;
   }catch(e){
     console.warn('ML fetch erro:',e);
+    alert('Erro de conexão com ML: ' + e.message);
     return false;
   }
 }
@@ -814,18 +816,23 @@ async function carregarKey(){
     if(savedId){const el=document.getElementById('key-ml-id');if(el)el.value=savedId;}
     // Trocar código por token
     const ok = await trocarCodigoPorToken(code);
-    if(ok) atualizarStatusML(true);
-    // Se não ok, mostrarCampoSecret já foi chamado dentro de trocarCodigoPorToken
+    if(ok){
+      atualizarStatusML(true);
+    } else {
+      alert('Erro ao conectar com o Mercado Livre. Tente novamente.');
+    }
+    // Após OAuth, se tiver chave Claude salva, entrar direto
+    if(S.key) entrarNoSistema();
   } else if(S.mlToken){
     atualizarStatusML(true);
   }
 
-  // Carregar chave Claude no campo
+  // Preencher chave Claude se salva
   if(S.key){
     const el=document.getElementById('key-claude');if(el)el.value=S.key;
   }
 
-  // Se já tem chave Claude, entrar direto
+  // Se já tem chave Claude, entrar direto no sistema
   if(S.key) entrarNoSistema();
 }
 
