@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>ClipsFlow · Alivvia</title>
+<title>ClipsFlow v8.5 · Alivvia</title>
 <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
 <style>
 
@@ -324,7 +324,7 @@ input::placeholder{color:var(--text3);}
   </div>
   <div style="display:flex;align-items:center;gap:8px;margin-left:auto;">
     <span id="ml-badge-header" style="display:none;" class="ml-badge"><span class="ml-badge-dot"></span>ML conectado</span>
-    <span class="logo-tag">v8</span>
+    <span class="logo-tag">v1.0.0</span>
   </div>
 </header>
 
@@ -614,18 +614,14 @@ input::placeholder{color:var(--text3);}
 
       <div id="ml-login-area">
         <div style="font-size:12px;color:var(--text2);margin-bottom:.875rem;line-height:1.6;">
-          Conecte sua conta ML para buscar nome, descrição, fotos e perguntas dos compradores automaticamente pelo link.
+          Conecte sua conta para buscar dados do produto automaticamente pelo link.
         </div>
-        <label style="margin-bottom:.375rem;display:block;">App ID do Mercado Livre</label>
-        <input type="text" id="key-ml-id" placeholder="4841931138507680" style="margin-bottom:.5rem;"/>
-
-        <button class="btn-ml" onclick="abrirAuthML()">
+        <button class="btn-ml" onclick="conectarML()">
           <span class="btn-ml-logo">🛒</span>
-          Entrar com Mercado Livre
+          Conectar Mercado Livre
         </button>
-        <div style="font-size:11px;color:var(--text3);margin-top:.5rem;text-align:center;line-height:1.6;">
-          Você será redirecionado para autorizar. Ao voltar, a conexão é feita automaticamente.<br>
-          <strong style="color:var(--text2);">Cadastre esta URL no DevCenter:</strong> <span id="redirect-uri-display" style="font-family:monospace;font-size:10px;"></span>
+        <div style="font-size:11px;color:var(--text3);margin-top:.5rem;text-align:center;">
+          Você será redirecionado para autorizar. Volta automaticamente.
         </div>
       </div>
 
@@ -636,8 +632,6 @@ input::placeholder{color:var(--text3);}
           <button onclick="desconectarML()" style="margin-left:auto;background:none;border:none;color:var(--text3);font-size:11px;cursor:pointer;font-family:'Inter',sans-serif;">desconectar</button>
         </div>
       </div>
-
-
 
       <div style="margin-top:1.5rem;">
         <button class="btn btn-primary btn-lg" style="width:100%;justify-content:center;" onclick="salvarKey()">
@@ -654,96 +648,36 @@ const API='https://api.anthropic.com/v1/messages';
 const MDL='claude-sonnet-4-20250514';
 const ML_APP_ID_FIXO='4841931138507680';
 
-const S={key:'',mlId:'',mlSecret:'',mlToken:'',link:'',desc:'',contexto:'',
+const S={key:'',mlUserId:'',link:'',desc:'',contexto:'',
   imgs:[],takes:[],analise:'',roteiro:'',nota:0,analiseTakes:'',edicao:'',
   numTakes:3,estilo:'ugc',tema:'choque',_tentativas:0};
 
-// ── MERCADO LIVRE AUTH com PKCE (sem client_secret) ──
-function getRedirectUri(){
-  if(window.location.protocol==='file:')
-    return 'https://pauloedupiva-design.github.io/clipsflow/';
-  return window.location.origin + window.location.pathname;
-}
+// ── MERCADO LIVRE AUTH (via backend) ──────────────────────────────────────────
+// O backend lida com App ID, Client Secret e PKCE — nunca ficam no front
 
-// Gerar code_verifier e code_challenge para PKCE
-function gerarCodeVerifier(){
-  const arr = new Uint8Array(32);
-  crypto.getRandomValues(arr);
-  return btoa(String.fromCharCode(...arr))
-    .replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
-}
+// URL do backend — mude para a URL de produção depois do deploy
+const BACKEND = 'https://clipsflow-backend.onrender.com';
+// Para testar local: const BACKEND = 'http://localhost:3000';
 
-async function gerarCodeChallenge(verifier){
-  const enc = new TextEncoder().encode(verifier);
-  const digest = await crypto.subtle.digest('SHA-256', enc);
-  return btoa(String.fromCharCode(...new Uint8Array(digest)))
-    .replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
-}
-
-async function abrirAuthML(){
-  const appId = document.getElementById('key-ml-id')?.value.trim() || ML_APP_ID_FIXO;
-  if(!appId){alert('Cole seu App ID do ML.');return;}
-  localStorage.setItem('cf_ml_id', appId);
-  S.mlId = appId;
-
-  // Gerar PKCE
-  const verifier = gerarCodeVerifier();
-  const challenge = await gerarCodeChallenge(verifier);
-  localStorage.setItem('cf_ml_verifier', verifier);
-
-  const redirectUri = getRedirectUri();
-  const url = `https://auth.mercadolivre.com.br/authorization?response_type=code&client_id=${appId}&redirect_uri=${encodeURIComponent(redirectUri)}&code_challenge=${challenge}&code_challenge_method=S256`;
-  window.location.href = url;
-}
-
-async function trocarCodigoPorToken(code){
-  const appId = localStorage.getItem('cf_ml_id') || ML_APP_ID_FIXO;
-  const verifier = localStorage.getItem('cf_ml_verifier') || '';
-  const redirectUri = getRedirectUri();
-
-  try{
-    const body = `grant_type=authorization_code&client_id=${appId}&code=${code}&redirect_uri=${encodeURIComponent(redirectUri)}&code_verifier=${encodeURIComponent(verifier)}`;
-    const r = await fetch('https://api.mercadolibre.com/oauth/token',{
-      method:'POST',
-      headers:{'Content-Type':'application/x-www-form-urlencoded','accept':'application/json'},
-      body
-    });
-    const d = await r.json();
-    if(d.access_token){
-      S.mlToken = d.access_token;
-      S.mlId = appId;
-      localStorage.setItem('cf_ml_token', d.access_token);
-      localStorage.setItem('cf_ml_id', appId);
-      if(d.refresh_token) localStorage.setItem('cf_ml_refresh', d.refresh_token);
-      localStorage.removeItem('cf_ml_verifier');
-      return true;
-    }
-    console.warn('ML token erro:', JSON.stringify(d));
-    alert('Erro ML: ' + (d.message || d.error || 'Tente reconectar.'));
-    return false;
-  }catch(e){
-    console.warn('ML fetch erro:',e);
-    alert('Erro de conexão com ML: ' + e.message);
-    return false;
-  }
+function conectarML(){
+  // Simplesmente redireciona para o backend iniciar o OAuth
+  window.location.href = BACKEND + '/api/ml/auth/start';
 }
 
 function desconectarML(){
-  S.mlToken='';S.mlId='';
-  localStorage.removeItem('cf_ml_token');
-  localStorage.removeItem('cf_ml_id');
-  localStorage.removeItem('cf_ml_refresh');
-  localStorage.removeItem('cf_ml_verifier');
+  S.mlToken  = '';
+  S.mlUserId = '';
+  localStorage.removeItem('cf_ml_user');
   atualizarStatusML(false);
 }
 
 function atualizarStatusML(conectado){
-  const login=document.getElementById('ml-login-area');
-  const connected=document.getElementById('ml-connected-area');
-  const badge=document.getElementById('ml-badge-header');
-  if(login) login.style.display=conectado?'none':'';
-  if(connected) connected.style.display=conectado?'':'none';
-  if(badge) badge.style.display=conectado?'':'none';
+  const login     = document.getElementById('ml-login-area');
+  const connected = document.getElementById('ml-connected-area');
+  const badge     = document.getElementById('ml-badge-header');
+  if(login)     login.style.display     = conectado ? 'none' : '';
+  if(connected) connected.style.display = conectado ? ''     : 'none';
+  if(badge)     badge.style.display     = conectado ? ''     : 'none';
 }
 
 function extrairItemId(link){
@@ -797,34 +731,28 @@ async function carregarKey(){
   S.mlId=localStorage.getItem('cf_ml_id')||'';
   S.mlToken=localStorage.getItem('cf_ml_token')||'';
 
-  // Preencher campos
+  // Preencher campos salvos
   if(S.mlId){const el=document.getElementById('key-ml-id');if(el)el.value=S.mlId;}
+  const savedSecret=localStorage.getItem('cf_ml_secret')||'';
+  if(savedSecret){const el=document.getElementById('ml-secret-input-setup');if(el)el.value=savedSecret;}
 
-  // Detectar retorno do ML com código OAuth na URL
-  const params = new URLSearchParams(window.location.search);
-  const code = params.get('code');
-  if(code){
-    // Limpar URL sem recarregar
+  // Detectar retorno do backend após OAuth ML
+  const params   = new URLSearchParams(window.location.search);
+  const mlOk     = params.get('ml_connected');
+  const mlUser   = params.get('ml_user');
+  const mlError  = params.get('ml_error');
+
+  if(mlOk === 'true' && mlUser){
+    localStorage.setItem('cf_ml_user', mlUser);
+    S.mlUserId = mlUser;
     window.history.replaceState({}, '', window.location.pathname);
-    // Mostrar splash para completar a conexão
-    document.getElementById('s-setup').style.display = '';
-    document.getElementById('main-header').style.display = 'none';
-    document.getElementById('main-steps').style.display = 'none';
-    document.getElementById('main-content').style.display = 'none';
-    // Preencher App ID se salvo
-    const savedId = localStorage.getItem('cf_ml_id');
-    if(savedId){const el=document.getElementById('key-ml-id');if(el)el.value=savedId;}
-    // Trocar código por token
-    const ok = await trocarCodigoPorToken(code);
-    if(ok){
-      atualizarStatusML(true);
-    } else {
-      alert('Erro ao conectar com o Mercado Livre. Tente novamente.');
-    }
-    // Após OAuth, se tiver chave Claude salva, entrar direto
-    if(S.key) entrarNoSistema();
-  } else if(S.mlToken){
     atualizarStatusML(true);
+  } else if(mlError){
+    window.history.replaceState({}, '', window.location.pathname);
+    alert('Erro ao conectar ML: ' + mlError + '\nTente novamente.');
+  } else {
+    const savedUser = localStorage.getItem('cf_ml_user');
+    if(savedUser){ S.mlUserId = savedUser; atualizarStatusML(true); }
   }
 
   // Preencher chave Claude se salva
