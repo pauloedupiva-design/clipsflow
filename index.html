@@ -667,7 +667,10 @@ const S={key:'',mlId:'',mlSecret:'',mlToken:'',link:'',desc:'',contexto:'',
 
 // ── MERCADO LIVRE AUTH (OAuth 2.0 com redirect automático) ──
 function getRedirectUri(){
-  // Retorna a URL base da página atual (funciona em Netlify, GitHub Pages, etc)
+  // Se estiver rodando local (file://), usa a URL do GitHub Pages
+  if(window.location.protocol === 'file:'){
+    return 'https://pauloedupiva-design.github.io/clipsflow/';
+  }
   return window.location.origin + window.location.pathname;
 }
 
@@ -825,7 +828,12 @@ function entrarNoSistema(){
 async function carregarKey(){
   // Mostrar redirect URI para o usuário cadastrar no DevCenter
   const uriDisplay = document.getElementById('redirect-uri-display');
-  if(uriDisplay) uriDisplay.textContent = window.location.origin + window.location.pathname;
+  if(uriDisplay){
+    const uri = window.location.protocol==='file:'
+      ? 'https://pauloedupiva-design.github.io/clipsflow/'
+      : window.location.origin + window.location.pathname;
+    uriDisplay.textContent = uri;
+  }
   S.key=localStorage.getItem('cf_k')||'';
   S.mlId=localStorage.getItem('cf_ml_id')||'';
   S.mlToken=localStorage.getItem('cf_ml_token')||'';
