@@ -618,8 +618,7 @@ input::placeholder{color:var(--text3);}
         </div>
         <label style="margin-bottom:.375rem;display:block;">App ID do Mercado Livre</label>
         <input type="text" id="key-ml-id" placeholder="4841931138507680" style="margin-bottom:.5rem;"/>
-        <label style="margin-bottom:.375rem;display:block;">Client Secret <span style="color:var(--text3);font-weight:400;">(fica só no seu navegador)</span></label>
-        <input type="password" id="ml-secret-input-setup" placeholder="sua chave secreta..." style="margin-bottom:.875rem;"/>
+
         <button class="btn-ml" onclick="abrirAuthML()">
           <span class="btn-ml-logo">🛒</span>
           Entrar com Mercado Livre
@@ -638,13 +637,7 @@ input::placeholder{color:var(--text3);}
         </div>
       </div>
 
-      <!-- Modal secret (fallback) -->
-      <div id="ml-secret-modal" style="display:none;margin-top:1rem;background:var(--bg3);border:1px solid var(--border2);border-radius:10px;padding:14px;">
-        <div style="font-size:13px;font-weight:600;margin-bottom:6px;">Complete a conexão</div>
-        <div style="font-size:12px;color:var(--text2);margin-bottom:.75rem;">Cole sua Client Secret para finalizar a autenticação:</div>
-        <input type="password" id="ml-secret-input" placeholder="Client Secret do DevCenter..." style="margin-bottom:.75rem;"/>
-        <button class="btn btn-primary" style="width:100%;justify-content:center;" onclick="confirmarSecret()">Confirmar →</button>
-      </div>
+
 
       <div style="margin-top:1.5rem;">
         <button class="btn btn-primary btn-lg" style="width:100%;justify-content:center;" onclick="salvarKey()">
@@ -665,70 +658,55 @@ const S={key:'',mlId:'',mlSecret:'',mlToken:'',link:'',desc:'',contexto:'',
   imgs:[],takes:[],analise:'',roteiro:'',nota:0,analiseTakes:'',edicao:'',
   numTakes:3,estilo:'ugc',tema:'choque',_tentativas:0};
 
-// ── MERCADO LIVRE AUTH (OAuth 2.0 com redirect automático) ──
+// ── MERCADO LIVRE AUTH com PKCE (sem client_secret) ──
 function getRedirectUri(){
-  // Se estiver rodando local (file://), usa a URL do GitHub Pages
-  if(window.location.protocol === 'file:'){
+  if(window.location.protocol==='file:')
     return 'https://pauloedupiva-design.github.io/clipsflow/';
-  }
   return window.location.origin + window.location.pathname;
 }
 
-function abrirAuthML(){
-  const appId = document.getElementById('key-ml-id').value.trim() || ML_APP_ID_FIXO;
+// Gerar code_verifier e code_challenge para PKCE
+function gerarCodeVerifier(){
+  const arr = new Uint8Array(32);
+  crypto.getRandomValues(arr);
+  return btoa(String.fromCharCode(...arr))
+    .replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
+}
+
+async function gerarCodeChallenge(verifier){
+  const enc = new TextEncoder().encode(verifier);
+  const digest = await crypto.subtle.digest('SHA-256', enc);
+  return btoa(String.fromCharCode(...new Uint8Array(digest)))
+    .replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
+}
+
+async function abrirAuthML(){
+  const appId = document.getElementById('key-ml-id')?.value.trim() || ML_APP_ID_FIXO;
   if(!appId){alert('Cole seu App ID do ML.');return;}
-  const secret = document.getElementById('ml-secret-input-setup')?.value.trim() || '';
   localStorage.setItem('cf_ml_id', appId);
-  if(secret) localStorage.setItem('cf_ml_secret', secret);
   S.mlId = appId;
+
+  // Gerar PKCE
+  const verifier = gerarCodeVerifier();
+  const challenge = await gerarCodeChallenge(verifier);
+  localStorage.setItem('cf_ml_verifier', verifier);
+
   const redirectUri = getRedirectUri();
-  // Redireciona para o ML — ao autorizar, volta para esta página com ?code=TG-...
-  window.location.href = `https://auth.mercadolivre.com.br/authorization?response_type=code&client_id=${appId}&redirect_uri=${encodeURIComponent(redirectUri)}`;
+  const url = `https://auth.mercadolivre.com.br/authorization?response_type=code&client_id=${appId}&redirect_uri=${encodeURIComponent(redirectUri)}&code_challenge=${challenge}&code_challenge_method=S256`;
+  window.location.href = url;
 }
 
 async function trocarCodigoPorToken(code){
   const appId = localStorage.getItem('cf_ml_id') || ML_APP_ID_FIXO;
-  const secret = localStorage.getItem('cf_ml_secret') || '';
+  const verifier = localStorage.getItem('cf_ml_verifier') || '';
   const redirectUri = getRedirectUri();
-  if(!secret){
-    // Sem secret, pedir para o usuário colar manualmente
-    mostrarCampoSecret(code, appId, redirectUri);
-    return false;
-  }
-  return await _trocarCode(code, appId, secret, redirectUri);
-}
 
-function mostrarCampoSecret(code, appId, redirectUri){
-  // Mostra modal para o usuário colar o client_secret e completar a troca
-  const area = document.getElementById('ml-secret-modal');
-  if(area){
-    area.style.display='';
-    area.dataset.code = code;
-    area.dataset.appId = appId;
-    area.dataset.redirectUri = redirectUri;
-  }
-}
-
-async function confirmarSecret(){
-  const area = document.getElementById('ml-secret-modal');
-  const secret = document.getElementById('ml-secret-input').value.trim();
-  if(!secret){alert('Cole sua Client Secret do ML.');return;}
-  localStorage.setItem('cf_ml_secret', secret);
-  const code = area.dataset.code;
-  const appId = area.dataset.appId;
-  const redirectUri = area.dataset.redirectUri;
-  area.style.display='none';
-  const ok = await _trocarCode(code, appId, secret, redirectUri);
-  if(ok) atualizarStatusML(true);
-  else alert('Erro ao trocar o código. Verifique sua Client Secret e tente reconectar.');
-}
-
-async function _trocarCode(code, appId, secret, redirectUri){
   try{
+    const body = `grant_type=authorization_code&client_id=${appId}&code=${code}&redirect_uri=${encodeURIComponent(redirectUri)}&code_verifier=${encodeURIComponent(verifier)}`;
     const r = await fetch('https://api.mercadolibre.com/oauth/token',{
       method:'POST',
       headers:{'Content-Type':'application/x-www-form-urlencoded','accept':'application/json'},
-      body:`grant_type=authorization_code&client_id=${appId}&client_secret=${encodeURIComponent(secret)}&code=${code}&redirect_uri=${encodeURIComponent(redirectUri)}`
+      body
     });
     const d = await r.json();
     if(d.access_token){
@@ -737,9 +715,10 @@ async function _trocarCode(code, appId, secret, redirectUri){
       localStorage.setItem('cf_ml_token', d.access_token);
       localStorage.setItem('cf_ml_id', appId);
       if(d.refresh_token) localStorage.setItem('cf_ml_refresh', d.refresh_token);
+      localStorage.removeItem('cf_ml_verifier');
       return true;
     }
-    console.warn('ML token erro:', d);
+    console.warn('ML token erro:', JSON.stringify(d));
     return false;
   }catch(e){
     console.warn('ML fetch erro:',e);
@@ -752,39 +731,17 @@ function desconectarML(){
   localStorage.removeItem('cf_ml_token');
   localStorage.removeItem('cf_ml_id');
   localStorage.removeItem('cf_ml_refresh');
+  localStorage.removeItem('cf_ml_verifier');
   atualizarStatusML(false);
 }
 
 function atualizarStatusML(conectado){
-  const login = document.getElementById('ml-login-area');
-  const connected = document.getElementById('ml-connected-area');
-  const badge = document.getElementById('ml-badge-header');
-  if(login) login.style.display = conectado ? 'none' : '';
-  if(connected) connected.style.display = conectado ? '' : 'none';
-  if(badge) badge.style.display = conectado ? '' : 'none';
-}
-
-// ── ML API: buscar dados do produto ──
-async function buscarDadosML(link){
-  const itemId = extrairItemId(link);
-  if(!itemId) return null;
-  const token = S.mlToken;
-  const headers = token ? {'Authorization':'Bearer '+token} : {};
-  const res = {itemId, titulo:'', descricao:'', preco:'', atributos:[], perguntas:[]};
-  try{
-    const r1 = await fetch(`https://api.mercadolibre.com/items/${itemId}`,{headers});
-    if(r1.ok){
-      const item = await r1.json();
-      res.titulo = item.title||'';
-      res.preco = item.price ? `R$ ${item.price}` : '';
-      res.atributos = (item.attributes||[]).filter(a=>a.value_name).map(a=>`${a.name}: ${a.value_name}`).slice(0,10);
-    }
-    const r2 = await fetch(`https://api.mercadolibre.com/items/${itemId}/description`,{headers});
-    if(r2.ok){const d=await r2.json();res.descricao=(d.plain_text||d.text||'').substring(0,1200);}
-    const r3 = await fetch(`https://api.mercadolibre.com/questions/search?item_id=${itemId}&api_version=4&limit=10`,{headers});
-    if(r3.ok){const q=await r3.json();res.perguntas=(q.questions||[]).map(x=>x.text||'').filter(Boolean).slice(0,8);}
-  }catch(e){console.warn('ML erro:',e);}
-  return res;
+  const login=document.getElementById('ml-login-area');
+  const connected=document.getElementById('ml-connected-area');
+  const badge=document.getElementById('ml-badge-header');
+  if(login) login.style.display=conectado?'none':'';
+  if(connected) connected.style.display=conectado?'':'none';
+  if(badge) badge.style.display=conectado?'':'none';
 }
 
 function extrairItemId(link){
