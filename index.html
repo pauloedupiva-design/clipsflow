@@ -75,10 +75,10 @@ input::placeholder,textarea::placeholder{color:#2a3f5a}
 #stageWrap{flex:1;overflow-y:auto;padding:1.25rem 1.5rem}
 #stageWrap::-webkit-scrollbar{width:4px}
 #stageWrap::-webkit-scrollbar-thumb{background:var(--border);border-radius:4px}
-#stageContent{max-width:860px;margin:0 auto}
+#stageContent{max-width:980px;margin:0 auto}
 
 /* CHAT */
-#chatPanel{width:300px;flex-shrink:0;border-left:1px solid var(--border);display:flex;flex-direction:column;background:var(--card)}
+#chatPanel{width:280px;flex-shrink:0;border-left:1px solid var(--border);display:flex;flex-direction:column;background:var(--card)}
 .chat-hdr{padding:.7rem 1rem;border-bottom:1px solid var(--border);font-size:12px;font-weight:600;color:var(--muted);display:flex;align-items:center;gap:6px;flex-shrink:0}
 .chat-dot{width:6px;height:6px;border-radius:50%;background:var(--verde);animation:pulse 2s infinite}
 @keyframes pulse{0%,100%{opacity:1}50%{opacity:.35}}
@@ -252,7 +252,7 @@ hr{border:none;border-top:1px solid var(--border);margin:1rem 0}
     <div class="h-logo">
       <div class="h-logo-mark">CF</div>
       <div class="h-logo-name">Clips<span>Flow</span></div>
-      <div style="font-size:9px;color:rgba(180,240,0,.5);margin-left:4px;font-weight:600;letter-spacing:.3px">v2.1</div>
+      <div style="font-size:9px;color:rgba(180,240,0,.5);margin-left:4px;font-weight:600;letter-spacing:.3px">v2.2</div>
     </div>
     <nav class="h-nav" id="appNav"></nav>
     <div class="h-user" id="appUser"></div>
@@ -295,7 +295,7 @@ function defaultState() {
     etapa2:{ fase:'config', takeAtual:0, estrutura:'', falas:[], roteiro:'', aprovado:false },
     etapa25:{ avaliacao:'', notas:{}, aprovado:false },
     etapa3:{ prompts:[], rawText:'', aprovado:false },
-    etapa4:{ blocoAtual:0, guia:[], aprovado:false }
+    etapa4:{ descricoes:[], guia:[], guiaCompleto:'', blocoAtual:0, aprovado:false }
   };
 }
 
@@ -308,6 +308,7 @@ function load() {
       const p = JSON.parse(d);
       S = Object.assign(defaultState(), p);
       S.etapa2 = Object.assign(defaultState().etapa2, p.etapa2 || {});
+      S.etapa4 = Object.assign(defaultState().etapa4, p.etapa4 || {});
     }
   } catch(e){}
 }
@@ -595,14 +596,29 @@ async function sendChat() {
   const stageNames = {0:'Produto',1:'Avatar',2:'Roteiro',2.5:'Personal Diretor',3:'Prompts Veo 3',4:'Guia CapCut',9:'Kit Final'};
   const stageName = stageNames[S.stage] || 'Etapa '+S.stage;
 
+  const stageCtx = {
+    0: 'Etapa 0 — Produto: o usuário vê a análise do produto. Pode pedir para detalhar um perfil de comprador, ajustar gatilhos emocionais ou corrigir informações.',
+    1: 'Etapa 1 — Avatar: aqui "avatar" = PROMPTS EM INGLÊS para gerar imagens no Veo 3 ou Midjourney. Não é um personagem de marketing. O usuário pode pedir para ajustar a descrição física, o ambiente, a postura ou o produto no prompt.',
+    2: 'Etapa 2 — Roteiro: o usuário está criando takes e escolhendo falas. Pode pedir para reescrever uma fala (sempre 20-25 palavras, conversa real), mudar a ação de um take, ou sugerir abordagem diferente.',
+    2.5: 'Etapa 2.5 — Personal Diretor: avaliação do roteiro. O usuário pode pedir esclarecimentos sobre as sugestões do Diretor ou pedir alternativas específicas.',
+    3: 'Etapa 3 — Prompts Veo 3: prompts em INGLÊS para gerar vídeos de 8 segundos no Google Veo 3. O usuário pode pedir ajustes na direção de câmera, no movimento do avatar, na descrição do produto, ou na fala em português.',
+    4: 'Etapa 4 — CapCut: guia de edição passo a passo. O usuário pode pedir explicação de um passo específico, ou descrever um problema que encontrou. Use linguagem simples, sem jargão técnico.',
+    9: 'Tela final — Kit de produção ou Avaliação de vídeo. Responda perguntas gerais sobre o processo ou oriente o próximo passo.'
+  };
+  const stageHint = stageCtx[S.stage] || '';
+
+  const falas = S.etapa2.falas ? S.etapa2.falas.filter(f=>f&&(f.escolhida||f.fala)).map((f,i)=>`Take ${i+1}: "${f.escolhida||f.fala}"`).join(' | ') : '';
+
   const ctx = [
     `Etapa atual: ${stageName}`,
-    S.etapa0.analise ? `Produto analisado: ${S.etapa0.analise.slice(0,400)}` : '',
-    S.etapa1.aprovado ? `Avatar aprovado: ${S.etapa1.promptAvatar.slice(0,200)}` : '',
-    S.etapa2.estrutura ? `Estrutura do roteiro: ${S.etapa2.estrutura.slice(0,300)}` : '',
-    S.etapa2.roteiro ? `Roteiro completo: ${S.etapa2.roteiro}` : '',
-    S.etapa25.avaliacao ? `Avaliação do Diretor: ${S.etapa25.avaliacao.slice(0,300)}` : '',
-    S.etapa3.prompts.length ? `Prompts Veo 3 gerados: ${S.etapa3.prompts.length} prompts` : '',
+    stageHint,
+    S.etapa0.analise ? `Produto analisado: ${S.etapa0.analise.slice(0,350)}` : '',
+    S.etapa1.aprovado ? `Avatar (prompt EN): ${S.etapa1.promptAvatar.slice(0,180)}` : '',
+    falas ? `Falas aprovadas: ${falas}` : '',
+    S.etapa2.roteiro ? `Roteiro: ${S.etapa2.roteiro.slice(0,400)}` : '',
+    S.etapa25.avaliacao ? `Avaliação do Diretor: ${S.etapa25.avaliacao.slice(0,250)}` : '',
+    S.etapa3.prompts.length ? `Prompts Veo 3: ${S.etapa3.prompts.length} prompts gerados` : '',
+    S.etapa4.guiaCompleto ? `Guia CapCut: gerado` : '',
   ].filter(Boolean).join('\n\n');
 
   const sys = `Você é o assistente do ClipsFlow — sistema de criação de vídeos UGC para vendedores do Mercado Livre.
@@ -611,13 +627,13 @@ CONTEXTO ATUAL:
 ${ctx}
 
 SUAS FUNÇÕES:
-1. CORREÇÃO: Se o usuário pedir para mudar algo do que foi gerado, corrija APENAS aquele ponto. Retorne só a parte corrigida no mesmo formato original.
-2. CONSULTIVO: Se o usuário tiver dúvidas ("como uso no Veo 3?", "o que é um take?", "onde clico no CapCut?"), explique de forma simples e direta para quem nunca fez vídeo.
-3. ORIENTAÇÃO: Se o usuário não souber o que fazer, oriente qual próximo passo tomar.
+1. CORREÇÃO: Se o usuário pedir para mudar algo do que foi gerado, corrija APENAS aquele ponto. Retorne a parte corrigida no mesmo formato, pronta para ser aplicada diretamente.
+2. CONSULTIVO: Se o usuário tiver dúvidas ("como uso no Veo 3?", "o que é um take?", "onde clico no CapCut?"), explique de forma simples para quem nunca fez vídeo.
+3. ORIENTAÇÃO: Se o usuário não souber o que fazer, oriente o próximo passo.
 
 REGRAS ABSOLUTAS:
-- NUNCA sugerir preços, valores monetários, "link na bio", "frete grátis", "últimas unidades", "acaba logo", CTAs explícitos ou escassez artificial — o ML não aceita isso.
-- A filosofia é: VENDER SEM PARECER QUE ESTÁ VENDENDO — gatilhos via storytelling, nunca via pressão.
+- NUNCA sugerir preços, "link na bio", "frete grátis", "últimas unidades", escassez artificial ou CTA de vendedor.
+- Vender sem parecer que está vendendo — storytelling, não pressão.
 - Responda sempre em português claro e simples.`;
 
   chatHist.push({ role:'user', content:txt });
@@ -626,10 +642,61 @@ REGRAS ABSOLUTAS:
   try {
     const r = await stream(sys, chatHist, sp);
     chatHist.push({ role:'assistant', content:r });
+    // Add "Aplicar ao projeto" button after response
+    const applyDiv = document.createElement('div');
+    applyDiv.className = 'chat-apply-row';
+    applyDiv.style.cssText = 'margin-top:.4rem;padding-top:.35rem;border-top:1px solid rgba(30,53,80,.5)';
+    applyDiv.innerHTML = `<button class="btn btn-ghost btn-sm" style="width:100%;font-size:11px" onclick="applyChat(this)">✎ Aplicar correção ao projeto</button>`;
+    div.appendChild(applyDiv);
   } catch(e) {
     sp.innerHTML = `<span style="color:var(--danger)">Erro: ${esc(e.message)}</span>`;
   }
   document.getElementById('chatSend').disabled = false;
+}
+
+function applyChat(btn) {
+  const bubble = btn.closest('.cm.ai');
+  if (!bubble) return;
+  // Get text content, excluding the apply button area
+  const clone = bubble.cloneNode(true);
+  const applyRow = clone.querySelector('.chat-apply-row');
+  if (applyRow) applyRow.remove();
+  const text = clone.innerText.trim();
+  if (!text) return;
+
+  switch(S.stage) {
+    case 0:
+      S.etapa0.analise = text;
+      S.etapa0.aprovado = false;
+      break;
+    case 1:
+      S.etapa1.rawText = text;
+      S.etapa1.aprovado = false;
+      break;
+    case 2:
+      if (S.etapa2.fase === 'takes' && S.etapa2.falas && S.etapa2.falas[S.etapa2.takeAtual]) {
+        S.etapa2.falas[S.etapa2.takeAtual].escolhida = text;
+        S.etapa2.falas[S.etapa2.takeAtual].fala = text;
+      } else if (S.etapa2.roteiro) {
+        S.etapa2.roteiro = text;
+        S.etapa2.estrutura = text;
+      }
+      break;
+    case 2.5:
+      S.etapa25.avaliacao = text;
+      break;
+    case 3:
+      S.etapa3.rawText = text;
+      break;
+    case 4:
+      S.etapa4.guiaCompleto = text;
+      break;
+  }
+  save();
+  renderStage();
+  btn.textContent = '✓ Aplicado!';
+  btn.disabled = true;
+  setTimeout(() => { btn.textContent = '✎ Aplicar correção ao projeto'; btn.disabled = false; }, 3000);
 }
 
 /* ── UTILS ── */
@@ -703,7 +770,6 @@ function html0() {
       </div>
     </div>`;
   }
-  const vOpts = ['curto','completo'].map(v=>`<span class="sel-pill${S.videoLen===v?' on':''}" onclick="setVLen('${v}')">${v==='curto'?'Curto (até 15s)':'Completo (30–60s)'}</span>`).join('');
   return `<div class="card">
     <div class="card-badge">Etapa 0 · Produto</div>
     <div class="card-title">Vamos entender o produto</div>
@@ -719,15 +785,11 @@ function html0() {
     </div>
     <div id="photoCount" style="font-size:11px;color:var(--muted);margin-bottom:.5rem">${S.photos.length}/${MAXPHOTOS} fotos</div>
     <div class="photo-grid" id="photoGrid"></div>
-    <label>Tipo de vídeo</label>
-    <div class="sel-group">${vOpts}</div>
     <label>Observações sobre seu público (opcional)</label>
     <textarea id="inCtx" rows="3" placeholder="Ex: mulheres 30–45 que fazem pilates..." style="margin-bottom:1rem">${esc(S.contexto||'')}</textarea>
     <button class="btn btn-primary" onclick="run0()" style="width:100%;justify-content:center">🔍 Analisar produto</button>
   </div>`;
 }
-
-function setVLen(v) { S.videoLen=v; S.numTakes=v==='curto'?2:4; renderStage(); save(); }
 
 async function run0() {
   S.link = document.getElementById('inLink')?.value.trim() || S.link;
@@ -889,9 +951,8 @@ function refazer1() { S.etapa1={rawText:'',promptAvatar:'',promptProduto:'',prom
 function html2() {
   if (S.etapa2.aprovado) return html2done();
   const {fase} = S.etapa2;
-  if (fase==='config' || !fase) return html2cfg();
-  if (fase==='estrutura')       return html2estrutura();
-  if (fase==='fala')            return html2fala();
+  if (!fase || fase === 'config') return html2cfg();
+  if (fase === 'takes' || fase === 'gerando') return html2take();
   return html2cfg();
 }
 
@@ -902,196 +963,176 @@ function html2cfg() {
   return `<div class="card">
     <div class="card-badge">Etapa 2 · Roteiro</div>
     <div class="card-title">Configure o roteiro</div>
-    <div class="card-sub">Os takes vão formar um story telling com começo, meio e fim — não cenas soltas.</div>
+    <div class="card-sub">Para cada take você vai ver a cena e escolher a melhor fala. Os takes formam um story telling com começo, meio e fim.</div>
     <label>Quantidade de takes</label>
     <div class="sel-group">${nOpts}</div>
     <label>Tema do vídeo</label>
     <div class="sel-group">${tOpts}</div>
-    <button class="btn btn-primary" onclick="runEstrutura()" style="width:100%;justify-content:center;margin-top:.5rem">🎬 Gerar estrutura</button>
+    <button class="btn btn-primary" onclick="runTake(0)" style="width:100%;justify-content:center;margin-top:.5rem">🎬 Gerar Take 1</button>
   </div>`;
 }
 
 function setNTakes(n) { S.numTakes=n; renderStage(); save(); }
 function setTema(t) { S.tema=t; renderStage(); save(); }
 
-async function runEstrutura() {
-  S.etapa2.fase='gerando'; S.etapa2.falas=[]; S.etapa2.takeAtual=0;
-  const el = document.getElementById('stageContent');
-  el.innerHTML = `<div class="card">
-    <div class="card-badge">Gerando estrutura...</div><div class="card-title">Roteiro — Estrutura</div>
-    <div class="out-block"><div class="out-hdr"><span class="out-lbl">ESTRUTURA</span></div>
-    <div class="out-body" id="outEst"></div></div>
+function html2take() {
+  const i = S.etapa2.takeAtual;
+  const fobj = (S.etapa2.falas && S.etapa2.falas[i]) || {estrutura:'', opcoes:[], escolhida:''};
+
+  // Previous approved takes (collapsed)
+  let prevHtml = '';
+  if (S.etapa2.falas) {
+    S.etapa2.falas.slice(0, i).forEach((f, idx) => {
+      const fala = f ? (f.escolhida || f.fala) : '';
+      if (!fala) return;
+      prevHtml += `<div class="out-block" style="opacity:.55;margin-bottom:.5rem">
+        <div class="out-hdr"><span class="out-lbl">✓ TAKE ${idx+1}</span></div>
+        <div class="out-body" style="font-size:11.5px">
+          ${f.estrutura ? `<div style="color:var(--muted);margin-bottom:.3rem;font-size:11px">${md(f.estrutura.split('\n').filter(l=>l.trim()).slice(0,3).join('\n'))}</div>` : ''}
+          <div style="padding:.35rem .6rem;background:rgba(20,60,100,.35);border-radius:5px;font-style:italic;font-size:12.5px;color:var(--text)">"${esc(fala)}"</div>
+        </div>
+      </div>`;
+    });
+  }
+
+  if (!fobj.estrutura && !fobj.opcoes.length) {
+    return `<div class="card">
+      ${prevHtml}
+      <div class="card-badge">Take ${i+1} de ${S.numTakes}</div>
+      <div class="card-title">Gerando Take ${i+1}...</div>
+      ${loadHtml('O diretor está montando a cena e as falas...', 'Aguarde alguns segundos')}
+    </div>`;
+  }
+
+  let h = `<div class="card">
+    ${prevHtml}
+    <div class="card-badge">Take ${i+1} de ${S.numTakes} · ${S.tema || 'Roteiro'}</div>
+    <div class="card-title">Take ${i+1} — Cena + Falas</div>
+    <div class="out-block">
+      <div class="out-hdr"><span class="out-lbl">🎬 CENA DO TAKE ${i+1}</span></div>
+      <div class="out-body">${md(fobj.estrutura)}</div>
+    </div>
+    <div style="margin:.75rem 0 .4rem;font-size:11.5px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.4px">Escolha a fala para esta cena:</div>
+    <div class="take-opts">`;
+
+  fobj.opcoes.forEach((op, idx) => {
+    h += `<div class="take-opt${fobj.escolhida===op?' on':''}" onclick="escolheFala(${idx})">
+      <div class="take-opt-num">Opção ${idx+1}</div>
+      <div class="take-opt-text">${esc(op)}</div>
+    </div>`;
+  });
+
+  h += `</div>
+    <div class="btn-row">
+      <button class="btn btn-ghost btn-sm" onclick="runTake(${i})">↺ Outras falas</button>
+      <button class="btn btn-primary" id="btnAprTake" ${!fobj.escolhida?'disabled':''} onclick="proxTake()">
+        ${i === S.numTakes-1 ? '✓ Concluir roteiro' : `✓ Take ${i+1} aprovado → Take ${i+2}`}
+      </button>
+    </div>
   </div>`;
+  return h;
+}
+
+async function runTake(idx) {
+  const numTakes = S.numTakes;
+  if (!S.etapa2.falas || S.etapa2.falas.length !== numTakes) {
+    S.etapa2.falas = Array.from({length: numTakes}, () => ({estrutura:'', opcoes:[], escolhida:'', fala:''}));
+  }
+  S.etapa2.fase = 'takes';
+  S.etapa2.takeAtual = idx;
+  S.etapa2.falas[idx] = {estrutura:'', opcoes:[], escolhida:'', fala:''};
+  save();
+  document.getElementById('stageContent').innerHTML = html2take();
+
+  const isFirst = idx === 0;
+  const isLast = idx === numTakes - 1;
+  const prevFalas = S.etapa2.falas.slice(0, idx)
+    .filter(f => f && (f.escolhida || f.fala))
+    .map((f, i) => `Take ${i+1}: "${f.escolhida||f.fala}"`)
+    .join('\n');
 
   const sys = `Você é roteirista e diretor de vídeo viral para TikTok/Reels.
 
 REGRAS ABSOLUTAS:
-- NUNCA "clique no link", "frete grátis", preço, CTA, escassez. Vender sem parecer que está vendendo.
-- O avatar CONVERSA como amiga fazendo uma descoberta — nunca como vendedor.
-- Takes formam STORY TELLING com começo, meio e fim. Não cenas soltas.
+- NUNCA: "clique no link", "frete grátis", preço, CTA de vendedor, escassez, slogan
+- O avatar CONVERSA como amiga contando uma descoberta — nunca como vendedora
+- Takes formam STORY TELLING: começo, meio, fim conectados
 
-CRÍTICO — VEO 3 GERA EXATAMENTE 8 SEGUNDOS POR TAKE:
-- A ação de cada take DEVE ser completável em 8 segundos
-- A fala deve caber em 8 segundos (~18 palavras no máximo em ritmo natural)
-- Sem ações longas ou complexas — 1 micro-momento por take
-- O creator deve estar SEMPRE em movimento usando/interagindo com o produto — NUNCA parada segurando
+VEO 3 = exatamente 8 segundos por take:
+- Ação completável em 8 segundos. Sem gestos longos ou deslocamentos grandes.
+- O creator SEMPRE em movimento usando/interagindo com o produto — NUNCA parado segurando
+- Fala: 20-25 palavras em ritmo de conversa natural. Conversa de verdade com quem assiste, não frases de impacto.
 
-Tema do vídeo: ${S.tema||'livre'}
-Número de takes: ${S.numTakes}
-Duração: ${S.videoLen==='curto'?'curto (~15s total = ~8s por take)':'completo (~30s total)'}
+Tema: ${S.tema || 'livre'}
+Take ${idx+1} de ${numTakes}.${isFirst ? '\nHOOK (Take 1): Começa in media res — direto numa situação real. Hook visual e verbal que prende nos primeiros 3s.' : ''}${isLast && numTakes > 1 ? '\nFECHAMENTO (último take): Encerra com satisfação natural — a descoberta se confirma sem forçar.' : ''}${idx > 0 && idx < numTakes-1 ? '\nDESENVOLVIMENTO: Aprofunda a experiência ou mostra benefício diferente.' : ''}
+${prevFalas ? `\nTakes anteriores aprovados:\n${prevFalas}` : ''}
 
-Crie a ESTRUTURA de ${S.numTakes} take(s) SEM incluir a fala. Para cada take:
+FORMATO EXATO — não adicione nada fora deste formato:
 
-**TAKE X — [título do momento]**
-- Objetivo: (qual emoção/ideia comunica no story)
-- Ação: (o que o creator faz COM o produto — movimento contínuo, não pose estática)
-- Câmera: (posição, ângulo, movimento — tudo para caber em 8s)
+TAKE ${idx+1} — [título curto do momento]
+OBJETIVO: [emoção/ideia que comunica no story]
+AÇÃO: [o que o creator faz COM o produto — movimento específico, 8 segundos]
+CÂMERA: [plano, ângulo e movimento para caber em 8s]
 
-TAKE 1 = hook visual que prende em 0–3s. Último take = fechamento natural com satisfação.`;
+OPÇÃO 1: [fala de 20-25 palavras — primeira pessoa, conversa real, tom natural]
+OPÇÃO 2: [fala de 20-25 palavras — ângulo diferente da mesma descoberta]
+OPÇÃO 3: [fala de 20-25 palavras — tom diferente, mesma cena]`;
 
   try {
-    const r = await stream(sys, [{role:'user',content:`Análise:\n${S.etapa0.analise.slice(0,500)}\nAvatar:\n${S.etapa1.promptAvatar.slice(0,200)}`}], document.getElementById('outEst'));
-    S.etapa2.estrutura = r; S.etapa2.fase='estrutura'; save();
-    el.innerHTML += `<div class="approve-bar">
-      <span class="approve-label">🎬 Estrutura pronta — aprova?</span>
-      <div style="display:flex;gap:8px">
-        <button class="btn btn-ghost btn-sm" onclick="refazerEst()">↺ Refazer</button>
-        <button class="btn btn-primary" onclick="iniciarFalas()">✓ Aprovado → Falas</button>
-      </div>
-    </div>`;
-  } catch(e) {
-    document.getElementById('outEst').innerHTML = `<div class="al-r alert">Erro: ${esc(e.message)}</div>`;
-  }
-}
+    const r = await call(sys, [{role:'user', content:`Produto:\n${S.etapa0.analise.slice(0,400)}\nAvatar:\n${S.etapa1.promptAvatar.slice(0,150)}`}], MAXTOK);
 
-function html2estrutura() {
-  return `<div class="card">
-    <div class="card-badge">Estrutura aprovada</div><div class="card-title">Roteiro — Estrutura</div>
-    <div class="out-block"><div class="out-body">${md(S.etapa2.estrutura)}</div></div>
-    <div class="approve-bar">
-      <span class="approve-label">✓ Estrutura ok</span>
-      <div style="display:flex;gap:8px">
-        <button class="btn btn-ghost btn-sm" onclick="refazerEst()">↺ Refazer</button>
-        <button class="btn btn-primary" onclick="iniciarFalas()">→ Gerar falas</button>
-      </div>
-    </div>
-  </div>`;
-}
+    // Parse structure (everything before first OPÇÃO)
+    const estrutura = r.split(/OPÇÃO\s*1:/i)[0].trim();
 
-function refazerEst() { S.etapa2.fase='config'; S.etapa2.estrutura=''; save(); renderStage(); }
-
-function iniciarFalas() {
-  S.etapa2.fase='fala'; S.etapa2.takeAtual=0;
-  S.etapa2.falas = Array.from({length:S.numTakes}, ()=>({opcoes:[],escolhida:''}));
-  save(); runFala(0);
-}
-
-function html2fala() {
-  const i = S.etapa2.takeAtual;
-  const fobj = S.etapa2.falas[i] || {opcoes:[],escolhida:''};
-  let h = `<div class="card">
-    <div class="card-badge">Take ${i+1} de ${S.numTakes} · Escolha a fala</div>
-    <div class="card-title">Fala do Take ${i+1}</div>`;
-  // Takes anteriores aprovados
-  S.etapa2.falas.slice(0,i).forEach((f,idx) => {
-    if (f.escolhida) h += `<div class="out-block" style="opacity:.65">
-      <div class="out-hdr"><span class="out-lbl">TAKE ${idx+1} ✓</span></div>
-      <div class="out-body" style="font-size:12px">${esc(f.escolhida)}</div>
-    </div>`;
-  });
-  if (!fobj.opcoes.length) {
-    h += loadHtml('Gerando opções de fala...');
-  } else {
-    h += `<div class="card-sub">Escolha a opção que mais combina:</div><div class="take-opts" id="takeOpts">`;
-    fobj.opcoes.forEach((op,idx) => {
-      h += `<div class="take-opt${fobj.escolhida===op?' on':''}" onclick="escolheFala(${idx})">
-        <div class="take-opt-num">Opção ${idx+1}</div>
-        <div class="take-opt-text">${esc(op)}</div>
-      </div>`;
+    // Parse 3 falas
+    const opcoes = [];
+    r.split('\n').forEach(line => {
+      const m = line.match(/^OPÇÃO\s*\d+:\s*(.+)/i);
+      if (m) opcoes.push(m[1].trim().replace(/^[""]|[""]$/g, ''));
     });
-    h += `</div><div class="btn-row">
-      <button class="btn btn-ghost btn-sm" onclick="runFala(${i})">↺ Novas opções</button>
-      <button class="btn btn-primary" id="btnAprTake" ${!fobj.escolhida?'disabled':''} onclick="aprTake()">
-        ${i===S.numTakes-1?'✓ Concluir roteiro':`✓ Take ${i+1} aprovado → Take ${i+2}`}
-      </button>
+
+    S.etapa2.falas[idx] = {estrutura, opcoes: opcoes.slice(0,3), escolhida:'', fala:''};
+    save();
+    document.getElementById('stageContent').innerHTML = html2take();
+  } catch(e) {
+    document.getElementById('stageContent').innerHTML = `<div class="card">
+      <div class="al-r alert">Erro ao gerar take: ${esc(e.message)}</div>
+      <button class="btn btn-secondary" style="margin-top:.5rem" onclick="runTake(${idx})">↺ Tentar novamente</button>
     </div>`;
   }
-  h += '</div>';
-  return h;
-}
-
-async function runFala(takeIdx) {
-  S.etapa2.fase='fala'; S.etapa2.takeAtual=takeIdx;
-  if (!S.etapa2.falas[takeIdx]) S.etapa2.falas[takeIdx]={opcoes:[],escolhida:''};
-  save();
-  document.getElementById('stageContent').innerHTML = html2fala();
-
-  const sys = `Você é roteirista de vídeo viral para TikTok/Reels. Escreve falas que parecem 100% reais.
-
-REGRAS ABSOLUTAS:
-- NUNCA: "clique no link", "frete grátis", preço, CTA, slogan, escassez, frase genérica
-- Tom: amiga contando uma descoberta para outra amiga — conversa real, não roteiro
-- CRÍTICO: Veo 3 gera 8 segundos por take. Fala MÁXIMO 18 palavras em ritmo natural de conversa
-- Cada fala deve ter 1 ideia central — não tente colocar tudo em uma fala
-- Use linguagem do dia a dia: "gente", "sério", "tipo", "olha"
-
-Este é o TAKE ${takeIdx+1} de ${S.numTakes}.
-${takeIdx===0?'HOOK: Prende nos primeiros 3 segundos. Comece com uma situação ou reação inesperada.':''}
-${takeIdx===S.numTakes-1&&S.numTakes>1?'FECHAMENTO: Sensação de descoberta concluída. Natural, sem forçar.':''}`;
-
-  const prev = S.etapa2.falas.slice(0,takeIdx).filter(f=>f.escolhida).map((f,i)=>`Take ${i+1}: "${f.escolhida}"`).join('\n');
-  const prompt = `Produto:\n${S.etapa0.analise.slice(0,300)}\nCena do take ${takeIdx+1}:\n${S.etapa2.estrutura.slice(0,300)}${prev?'\nFalas já aprovadas:\n'+prev:''}
-
-Gere 3 opções de fala para o TAKE ${takeIdx+1}. Máximo 18 palavras cada. Sem markdown, sem títulos, sem explicações.
-
-OPÇÃO 1
-[escreva só a fala aqui]
-
-OPÇÃO 2
-[escreva só a fala aqui]
-
-OPÇÃO 3
-[escreva só a fala aqui]`;
-
-  try {
-    const r = await call(sys, [{role:'user',content:prompt}]);
-    S.etapa2.falas[takeIdx].opcoes = parseFalas(r);
-    S.etapa2.falas[takeIdx].escolhida = '';
-    save();
-    document.getElementById('stageContent').innerHTML = html2fala();
-  } catch(e) {
-    document.getElementById('stageContent').innerHTML = `<div class="card"><div class="al-r alert">Erro: ${esc(e.message)}</div>
-      <button class="btn btn-secondary" onclick="runFala(${takeIdx})">↺ Tentar novamente</button></div>`;
-  }
-}
-
-function parseFalas(text) {
-  // Remove any markdown artifacts first
-  const clean = text.replace(/#{1,3}\s*[^\n]*/g,'').replace(/\*\*[^*]+\*\*/g,'').replace(/---/g,'').replace(/^\s*[\-\*]\s*/gm,'');
-  const parts = clean.split(/OPÇÃO\s*\d+/i).map(s=>s.trim()).filter(s=>s.length>5);
-  return parts.length >= 2 ? parts.slice(0,3) : [text.trim()];
 }
 
 function escolheFala(idx) {
   const i = S.etapa2.takeAtual;
+  if (!S.etapa2.falas || !S.etapa2.falas[i]) return;
   S.etapa2.falas[i].escolhida = S.etapa2.falas[i].opcoes[idx];
+  S.etapa2.falas[i].fala = S.etapa2.falas[i].escolhida;
   save();
-  document.querySelectorAll('.take-opt').forEach((el,j)=>el.classList.toggle('on',j===idx));
+  document.querySelectorAll('.take-opt').forEach((el, j) => el.classList.toggle('on', j===idx));
   const btn = document.getElementById('btnAprTake');
   if (btn) btn.disabled = false;
 }
 
-async function aprTake() {
+function proxTake() {
   const i = S.etapa2.takeAtual;
   if (!S.etapa2.falas[i]?.escolhida) return;
-  if (i < S.numTakes-1) { await runFala(i+1); }
+  if (i < S.numTakes-1) { runTake(i+1); }
   else { concluirRoteiro(); }
 }
 
 function concluirRoteiro() {
   let r = '# ROTEIRO COMPLETO\n\n';
-  S.etapa2.falas.forEach((f,i)=>{ r+=`## TAKE ${i+1}\n${f.escolhida}\n\n`; });
-  S.etapa2.roteiro = r; S.etapa2.fase='concluido'; S.etapa2.aprovado=true;
+  S.etapa2.falas.forEach((f, i) => {
+    r += `## TAKE ${i+1}\n`;
+    if (f.estrutura) {
+      f.estrutura.split('\n').filter(l=>l.trim()).forEach(l => { r += l + '\n'; });
+    }
+    r += `\n**Fala:** "${f.escolhida||f.fala}"\n\n`;
+  });
+  S.etapa2.roteiro = r;
+  S.etapa2.estrutura = r;
+  S.etapa2.fase = 'concluido';
+  S.etapa2.aprovado = true;
   save(); renderStage();
 }
 
@@ -1152,6 +1193,7 @@ Se alguma nota < 8, apresente EXATAMENTE 3 alternativas de melhoria:
 **OPÇÃO A:** [descrição curta] — [nova versão do trecho]
 **OPÇÃO B:** [descrição curta] — [nova versão do trecho]
 **OPÇÃO C:** [descrição curta] — [nova versão do trecho]
+**RECOMENDO:** Opção [X] — [1 linha explicando por que é a melhor das três para este produto e público]
 
 Se todas ≥ 8: escreva apenas "✓ ROTEIRO APROVADO"`;
 
@@ -1180,23 +1222,15 @@ Se todas ≥ 8: escreva apenas "✓ ROTEIRO APROVADO"`;
 
 async function aplicarOpcao(letra) {
   const el = document.getElementById('stageContent');
-  el.innerHTML = `<div class="card">${loadHtml('Aplicando Opção '+letra+'...','Corrigindo o ponto indicado')}</div>`;
+  el.innerHTML = `<div class="card">${loadHtml('Aplicando Opção '+letra+'...','O Diretor está ajustando o roteiro')}</div>`;
   try {
-    const r = await call(`Aplique APENAS a OPÇÃO ${letra} da avaliação ao roteiro. Não altere o restante. Retorne o roteiro completo corrigido. Sem markdown desnecessário.`,
+    const r = await call(`Aplique APENAS a OPÇÃO ${letra} da avaliação ao roteiro. Mantenha exatamente ${S.numTakes} takes. Retorne o roteiro completo corrigido em português, no mesmo formato. Sem markdown desnecessário.`,
       [{role:'user',content:`Avaliação:\n${S.etapa25.avaliacao}\n\nRoteiro atual:\n${S.etapa2.roteiro}`}]);
-    S.etapa2.roteiro = r; S.etapa25.aprovado = false; save();
-    el.innerHTML = `<div class="card">
-      <div class="card-badge" style="background:rgba(180,240,0,.1);color:var(--verde)">✓ Opção ${letra} aplicada</div>
-      <div class="card-title">Roteiro atualizado</div>
-      <div class="out-block"><div class="out-body">${md(r)}</div></div>
-      <div class="approve-bar">
-        <span class="approve-label">Ficou bom?</span>
-        <div style="display:flex;gap:8px">
-          <button class="btn btn-ghost btn-sm" onclick="run25()">↺ Reavaliar</button>
-          <button class="btn btn-primary" onclick="ok25()">✓ Aprovado → Veo 3</button>
-        </div>
-      </div>
-    </div>`;
+    S.etapa2.roteiro = r;
+    S.etapa25.aprovado = false;
+    save();
+    // Reavaliar automaticamente com o roteiro atualizado
+    run25();
   } catch(e) {
     el.innerHTML=`<div class="card"><div class="al-r alert">Erro: ${esc(e.message)}</div></div>`;
   }
@@ -1287,7 +1321,7 @@ function html3res() {
         <button class="cp-btn" onclick="copyText(document.querySelectorAll('.prompt-box')[${i}].textContent,this)">Copiar</button>
       </div>
       <div class="prompt-box">${esc(p)}</div>
-      <div class="prompt-transl">💬 Fala: "${esc(S.etapa2.falas[i]?.escolhida||'').slice(0,80)}..."</div>
+      ${(S.etapa3.resumos && S.etapa3.resumos[i]) ? `<div class="prompt-transl">🇧🇷 <strong>O que este prompt diz:</strong> ${esc(S.etapa3.resumos[i].slice(0,220))}</div>` : `<div class="prompt-transl">💬 Fala: "${esc(((S.etapa2.falas[i]?.escolhida||S.etapa2.falas[i]?.fala)||'').slice(0,80))}"</div>`}
     </div>`).join('') : `<div class="out-block"><div class="out-body">${md(S.etapa3.rawText)}</div></div>`;
 
   return `<div class="card">
@@ -1311,85 +1345,121 @@ function refazer3() { S.etapa3={prompts:[],resumos:[],rawText:'',aprovado:false}
 /* ════════════════════════════════════════
    ETAPA 4 — CAPCUT
 ════════════════════════════════════════ */
-const CC = [
-  {n:1, icon:'🔍', label:'Diagnóstico + Ordem',  desc:'Nota por take, melhor para abertura, ordem HOOK→CONTEXTO→PROVA→FECHAMENTO'},
-  {n:2, icon:'✂️', label:'Cortes + Ritmo',        desc:'Tempo exato de cada corte, aceleração 1.05x–1.15x se lento'},
-  {n:3, icon:'🔭', label:'Visual + Transições',   desc:'Zoom leve, corte seco preferido, transição máx 0.4s se necessário'},
-  {n:4, icon:'🎵', label:'Áudio + Legendas',      desc:'Melhoria de voz, redução de ruído, legenda sincronizada'},
-  {n:5, icon:'✅', label:'Finalização',            desc:'Início prende? Meio mantém? Final decide? Exportar 1080×1920 9:16'},
-];
-
 function html4() {
   if (S.etapa4.aprovado) return htmlFinal();
-  const cur = S.etapa4.blocoAtual || 0;
-  const steps = CC.map(b=>{
-    const cls = b.n-1 < cur ? 'done' : b.n-1===cur ? 'active' : 'locked';
-    return `<div class="cc-step ${cls}">
-      <span class="cc-step-icon">${cls==='done'?'✓':b.icon}</span>
-      <span><strong>${b.label}</strong> — ${b.desc}</span>
+  if (S.etapa4.guiaCompleto) return html4guia();
+  return html4form();
+}
+
+function html4form() {
+  const takeForms = (S.etapa2.falas || []).map((f, i) => {
+    const fala = (f ? (f.escolhida || f.fala) : '') || '';
+    return `<div style="margin-bottom:.875rem">
+      <label style="color:var(--verde);font-size:12px;text-transform:none;letter-spacing:0">Take ${i+1} <span style="color:var(--muted);font-weight:400"> — fala: "${esc(fala.slice(0,55))}${fala.length>55?'...':''}"</span></label>
+      <textarea id="descTake${i}" rows="2" placeholder="Como ficou? Ex: ela ficou em pé usando o produto, parecia natural. / ficou um pouco escuro, ela ficou parada segurando." style="margin-top:.3rem">${esc((S.etapa4.descricoes||[])[i]||'')}</textarea>
     </div>`;
   }).join('');
 
-  const guias = S.etapa4.guia.map((g,i)=>`
-    <div class="out-block">
-      <div class="out-hdr"><span class="out-lbl">${CC[i].label}</span></div>
-      <div class="out-body">${md(g)}</div>
-    </div>`).join('');
-
-  const done = cur >= CC.length;
   return `<div class="card">
     <div class="card-badge">Etapa 4 · CapCut</div>
-    <div class="card-title">Guia de Edição CapCut Pro</div>
-    <div class="card-sub">Este NÃO é um vídeo bonito. É um vídeo que vende. Menos é mais.</div>
-    <div class="cc-steps">${steps}</div>
-    ${guias}
-    ${done ? `<div class="approve-bar">
-      <span class="approve-label">🎬 Guia completo!</span>
-      <button class="btn btn-primary" onclick="finalizarCC()">✓ Concluir → Kit de Exportação</button>
-    </div>` : `<div class="btn-row">
-      <button class="btn btn-primary" onclick="runBlocoCC()">${cur===0?'▶ Iniciar guia':'▶ '+CC[cur].label}</button>
-    </div>`}
+    <div class="card-title">Como ficaram seus vídeos?</div>
+    <div class="card-sub">Descreva em 1-2 linhas o resultado de cada take. Com isso o guia é 100% específico — sem nenhuma decisão para você tomar.</div>
+    ${takeForms}
+    <button class="btn btn-primary" onclick="runGuiaCC()" style="width:100%;justify-content:center;margin-top:.25rem">✂️ Gerar guia de edição</button>
+    <div style="margin-top:.75rem;text-align:center">
+      <button class="btn btn-ghost btn-sm" onclick="finalTab='avaliar';goStage(9)">🎥 Avaliar problema em vídeo já gravado</button>
+    </div>
   </div>`;
 }
 
-async function runBlocoCC() {
-  const i = S.etapa4.blocoAtual;
-  const b = CC[i];
-  const btn = document.querySelector('#stageContent .btn-primary');
-  if (btn) btn.disabled = true;
+async function runGuiaCC() {
+  const descs = (S.etapa2.falas || []).map((_, i) => {
+    const el = document.getElementById(`descTake${i}`);
+    return el ? el.value.trim() : '';
+  });
+  S.etapa4.descricoes = descs;
+  save();
 
-  const sys = `Você ensina edição de vídeo no CapCut para pessoas que nunca editaram nada na vida.
-A pessoa vai seguir cada passo no celular enquanto você fala. Seja o guia do lado dela.
+  const el = document.getElementById('stageContent');
+  el.innerHTML = `<div class="card">${loadHtml('Gerando guia de edição...', 'O diretor está montando o passo a passo para você')}</div>`;
 
-REGRAS:
-- Linguagem simples, como conversa — sem termos técnicos
-- Sem EQ, compressão, codec, LUT, BPM, dB, Hz, keyframe — esses termos não existem aqui
-- Use nomes reais dos botões do CapCut: "toque em +", "arraste o controle de volume", "toque em Texto"
-- Máximo 2 linhas por passo
-- A pessoa deve terminar este bloco em menos de 10 minutos
+  const descText = (S.etapa2.falas || []).map((f, i) => {
+    const fala = f ? (f.escolhida || f.fala || '') : '';
+    return `Take ${i+1} — fala: "${fala}" — como ficou: ${descs[i] || 'não informado'}`;
+  }).join('\n');
 
-BLOCO: ${b.label}
-Objetivo: ${b.desc}
+  const sys = `Você é um editor de vídeo profissional ensinando para alguém que NUNCA editou nada na vida.
+A pessoa vai seguir cada passo no celular agora, enquanto lê.
 
-Formato obrigatório:
-**${b.label}**
+REGRAS ABSOLUTAS:
+- Linguagem de conversa, zero termos técnicos
+- PROIBIDO: EQ, compressão, codec, LUT, BPM, dB, Hz, keyframe, timeline, fps
+- Use nomes exatos dos botões do CapCut: "toque em +", "arraste o controle de volume", "toque em Texto", "deslize para a esquerda", "toque em Velocidade"
+- VOCÊ DECIDE TUDO. A pessoa só executa. Sem perguntas. Sem "escolha o que achar melhor".
+- Máximo 2 linhas por passo, linguagem de conversa direta
+- A pessoa deve terminar tudo em 30 minutos no máximo
+- Se um take ficou com problema (descrito), diga exatamente como compensar na edição
 
-Passo 1: [ação simples e direta]
-Passo 2: [ação simples e direta]
-[continue até concluir o bloco]
+ESTRUTURA: 5 blocos numerados, cada um com passos numerados.
 
-✅ Pronto quando: [como saber que terminou este bloco]`;
+**BLOCO 1 — ORDEM DOS TAKES**
+Diga qual take vai primeiro, qual vai segundo, etc. Explique em 1 frase simples por que essa ordem funciona melhor (sem jargão).
 
-  const prev = S.etapa4.guia.map((g,idx)=>`${CC[idx].label}:\n${g.slice(0,150)}`).join('\n\n');
+**BLOCO 2 — CORTES**
+Para cada take: diga onde começa a cortar e onde para. Se precisa acelerar algum, diga qual e quanto (ex: "arraste a velocidade para 1.1x — só um pouquinho mais rápido").
+
+**BLOCO 3 — VISUAL**
+Diga exatamente onde fazer zoom leve (qual take, onde na tela, quando). Se usar transição: onde e qual tipo (corte direto é melhor — só coloca transição se for necessário mesmo).
+
+**BLOCO 4 — ÁUDIO E LEGENDA**
+Passo a passo para: ajustar volume da voz, adicionar legenda automática sincronizada, destacar 2-3 palavras-chave na legenda.
+
+**BLOCO 5 — EXPORTAÇÃO**
+Passos exatos para exportar em 1080x1920 (vertical). Como conferir se ficou certo. Pronto.
+
+Termine com: "✅ Feito! Seu vídeo está editado e pronto para publicar."`;
+
   try {
-    const r = await call(sys, [{role:'user',content:`Roteiro do vídeo:\n${S.etapa2.roteiro.slice(0,400)}\nNúmero de takes: ${S.numTakes}\nFalas: ${S.etapa2.falas.map((f,i)=>`Take ${i+1}: "${f.escolhida}"`).join(' | ')}${prev?'\nBlocos já feitos:\n'+prev:''}`}]);
-    S.etapa4.guia.push(r);
-    S.etapa4.blocoAtual = i+1;
-    save(); renderStage();
+    const r = await call(sys, [{role:'user', content:`Roteiro completo:\n${S.etapa2.roteiro}\n\nTakes gravados:\n${descText}\n\nTotal de takes: ${S.numTakes}`}], 6000);
+    S.etapa4.guiaCompleto = r;
+    S.etapa4.blocoAtual = 5;
+    save();
+    el.innerHTML = html4guia();
   } catch(e) {
-    alert('Erro: '+e.message);
-    renderStage();
+    el.innerHTML = `<div class="card"><div class="al-r alert">Erro: ${esc(e.message)}</div>
+      <button class="btn btn-secondary" style="margin-top:.5rem" onclick="runGuiaCC()">↺ Tentar novamente</button></div>`;
   }
+}
+
+function html4guia() {
+  return `<div class="card">
+    <div class="card-badge">Etapa 4 · CapCut</div>
+    <div class="card-title">Guia de Edição — Passo a Passo</div>
+    <div class="card-sub">Siga os blocos em ordem. Você não precisa tomar nenhuma decisão — só executar.</div>
+    <div class="out-block">
+      <div class="out-hdr">
+        <span class="out-lbl">GUIA COMPLETO</span>
+        <button class="cp-btn" onclick="copyText(S.etapa4.guiaCompleto, this)">Copiar</button>
+      </div>
+      <div class="out-body" style="max-height:560px">${md(S.etapa4.guiaCompleto)}</div>
+    </div>
+    <div class="al-b alert" style="font-size:12px;margin:.5rem 0">
+      💬 Travou em algum passo? Escreva no chat ao lado descrevendo onde parou — o assistente explica na hora.
+    </div>
+    <div class="approve-bar">
+      <span class="approve-label">✂️ Guia pronto — editou o vídeo?</span>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button class="btn btn-ghost btn-sm" onclick="refazerCC()">↺ Refazer</button>
+        <button class="btn btn-ghost btn-sm" onclick="finalTab='avaliar';goStage(9)">🎥 Avaliar vídeo</button>
+        <button class="btn btn-primary" onclick="finalizarCC()">✓ Concluído → Kit Final</button>
+      </div>
+    </div>
+  </div>`;
+}
+
+function refazerCC() {
+  S.etapa4 = {descricoes:[], guia:[], guiaCompleto:'', blocoAtual:0, aprovado:false};
+  save(); renderStage();
 }
 
 function finalizarCC() { S.etapa4.aprovado=true; S.stage=9; save(); renderNav(); renderStage(); }
@@ -1469,9 +1539,12 @@ function buildKit() {
     k += '---\n\n## PROMPTS VEO 3\n\n';
     S.etapa3.prompts.forEach((p,i)=>{ k+=`### TAKE ${i+1}\n${p}\n\n`; });
   }
-  if (S.etapa4.guia.length) {
+  if (S.etapa4.guiaCompleto) {
     k += '---\n\n## GUIA CAPCUT\n\n';
-    S.etapa4.guia.forEach((g,i)=>{ k+=`### ${CC[i].label}\n${g}\n\n`; });
+    k += S.etapa4.guiaCompleto + '\n\n';
+  } else if (S.etapa4.guia.length) {
+    k += '---\n\n## GUIA CAPCUT\n\n';
+    S.etapa4.guia.forEach((g,i)=>{ k+=`### Bloco ${i+1}\n${g}\n\n`; });
   }
   return k;
 }
