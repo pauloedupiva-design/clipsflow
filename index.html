@@ -644,7 +644,7 @@ function extractItemId(link) {
 async function fetchML(itemId) {
   if (!S.mlUser) return null;
   try {
-    const r = await fetch(`${BACKEND}/api/ml/items/${itemId}`);
+    const r = await fetch(`${BACKEND}/api/ml/items/${itemId}?user_id=${S.mlUser}`);
     if (!r.ok) return null;
     return await r.json();
   } catch { return null; }
