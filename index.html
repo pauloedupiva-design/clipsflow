@@ -72,13 +72,13 @@ input::placeholder,textarea::placeholder{color:#2a3f5a}
 .nav-sep{color:rgba(255,255,255,.15);font-size:9px;flex-shrink:0;padding:0 1px}
 .h-user{margin-left:auto;font-size:11px;color:rgba(255,255,255,.4);flex-shrink:0}
 .app-body{display:flex;flex:1;overflow:hidden}
-#stageWrap{flex:1;overflow-y:auto;padding:1.5rem 1.25rem}
+#stageWrap{flex:1;overflow-y:auto;padding:1.25rem 1.5rem}
 #stageWrap::-webkit-scrollbar{width:4px}
 #stageWrap::-webkit-scrollbar-thumb{background:var(--border);border-radius:4px}
-#stageContent{max-width:680px;margin:0 auto}
+#stageContent{max-width:860px;margin:0 auto}
 
 /* CHAT */
-#chatPanel{width:310px;flex-shrink:0;border-left:1px solid var(--border);display:flex;flex-direction:column;background:var(--card)}
+#chatPanel{width:300px;flex-shrink:0;border-left:1px solid var(--border);display:flex;flex-direction:column;background:var(--card)}
 .chat-hdr{padding:.7rem 1rem;border-bottom:1px solid var(--border);font-size:12px;font-weight:600;color:var(--muted);display:flex;align-items:center;gap:6px;flex-shrink:0}
 .chat-dot{width:6px;height:6px;border-radius:50%;background:var(--verde);animation:pulse 2s infinite}
 @keyframes pulse{0%,100%{opacity:1}50%{opacity:.35}}
@@ -123,7 +123,7 @@ input::placeholder,textarea::placeholder{color:#2a3f5a}
 .out-block{background:#060e1a;border:1px solid var(--border);border-radius:9px;overflow:hidden;margin:.7rem 0}
 .out-hdr{padding:6px 12px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;background:rgba(20,60,100,.15)}
 .out-lbl{font-size:10px;font-weight:700;color:var(--verde);text-transform:uppercase;letter-spacing:.5px;font-family:monospace}
-.out-body{padding:12px;font-size:13px;line-height:1.72;color:var(--text);max-height:340px;overflow-y:auto}
+.out-body{padding:12px;font-size:13px;line-height:1.72;color:var(--text);max-height:420px;overflow-y:auto}
 .out-body::-webkit-scrollbar{width:3px}
 .out-body::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
 .out-body h1,.out-body h2,.out-body h3{font-size:14px;font-weight:700;color:var(--verde);margin:.6rem 0 .35rem}
@@ -343,7 +343,9 @@ function renderNav() {
   STAGES.forEach((st,i) => {
     if (i > 0) h += '<span class="nav-sep">›</span>';
     const cls = st.key < S.stage ? 'done' : st.key === S.stage ? 'active' : 'locked';
-    h += `<span class="nav-pill ${cls}">${st.label}</span>`;
+    const click = cls === 'done' ? `onclick="goStage(${st.key})"` : '';
+    const cursor = cls === 'done' ? 'cursor:pointer' : '';
+    h += `<span class="nav-pill ${cls}" ${click} style="${cursor}">${st.label}</span>`;
   });
   el.innerHTML = h;
   // scroll active pill into view on narrow viewports
@@ -562,9 +564,12 @@ function photosMsg() {
 /* ── CHAT ── */
 let chatHist = [];
 function initChat() {
-  chatHist = [];
+  // Não resetar histórico ao mudar de etapa — mantém contexto da sessão
   const el = document.getElementById('chatMsgs');
-  if (el) el.innerHTML = '<div class="cm-hint">Escreva o que quer mudar e a IA corrige só aquela parte.</div>';
+  if (!el) return;
+  if (!chatHist.length) {
+    el.innerHTML = '<div class="cm-hint">Pergunte qualquer coisa ou peça para mudar algo. Estou aqui para ajudar.</div>';
+  }
 }
 function chatKey(e) { if (e.key==='Enter' && !e.shiftKey) { e.preventDefault(); sendChat(); } }
 
@@ -586,14 +591,34 @@ async function sendChat() {
   document.getElementById('chatSend').disabled = true;
   appendCM('user', esc(txt));
 
-  const ctx = [
-    `Etapa atual: ${S.stage}`,
-    S.etapa0.aprovado ? `Análise: ${S.etapa0.analise.slice(0,300)}...` : '',
-    S.etapa1.aprovado ? `Avatar: ${S.etapa1.promptAvatar.slice(0,150)}...` : '',
-    S.etapa2.roteiro  ? `Roteiro: ${S.etapa2.roteiro.slice(0,300)}...` : '',
-  ].filter(Boolean).join('\n');
+  const stageNames = {0:'Produto',1:'Avatar',2:'Roteiro',2.5:'Personal Diretor',3:'Prompts Veo 3',4:'Guia CapCut',9:'Kit Final'};
+  const stageName = stageNames[S.stage] || 'Etapa '+S.stage;
 
-  const sys = `Você é o assistente de correção local do ClipsFlow.\nContexto da etapa:\n${ctx}\n\nREGRA: Corrija APENAS o ponto pedido. Não refaça tudo. Retorne só a parte corrigida. Responda em português.`;
+  const ctx = [
+    `Etapa atual: ${stageName}`,
+    S.etapa0.analise ? `Produto analisado: ${S.etapa0.analise.slice(0,400)}` : '',
+    S.etapa1.aprovado ? `Avatar aprovado: ${S.etapa1.promptAvatar.slice(0,200)}` : '',
+    S.etapa2.estrutura ? `Estrutura do roteiro: ${S.etapa2.estrutura.slice(0,300)}` : '',
+    S.etapa2.roteiro ? `Roteiro completo: ${S.etapa2.roteiro}` : '',
+    S.etapa25.avaliacao ? `Avaliação do Diretor: ${S.etapa25.avaliacao.slice(0,300)}` : '',
+    S.etapa3.prompts.length ? `Prompts Veo 3 gerados: ${S.etapa3.prompts.length} prompts` : '',
+  ].filter(Boolean).join('\n\n');
+
+  const sys = `Você é o assistente do ClipsFlow — sistema de criação de vídeos UGC para vendedores do Mercado Livre.
+
+CONTEXTO ATUAL:
+${ctx}
+
+SUAS FUNÇÕES:
+1. CORREÇÃO: Se o usuário pedir para mudar algo do que foi gerado, corrija APENAS aquele ponto. Retorne só a parte corrigida no mesmo formato original.
+2. CONSULTIVO: Se o usuário tiver dúvidas ("como uso no Veo 3?", "o que é um take?", "onde clico no CapCut?"), explique de forma simples e direta para quem nunca fez vídeo.
+3. ORIENTAÇÃO: Se o usuário não souber o que fazer, oriente qual próximo passo tomar.
+
+REGRAS ABSOLUTAS:
+- NUNCA sugerir preços, valores monetários, "link na bio", "frete grátis", "últimas unidades", "acaba logo", CTAs explícitos ou escassez artificial — o ML não aceita isso.
+- A filosofia é: VENDER SEM PARECER QUE ESTÁ VENDENDO — gatilhos via storytelling, nunca via pressão.
+- Responda sempre em português claro e simples.`;
+
   chatHist.push({ role:'user', content:txt });
   const div = appendCM('ai', '<span class="streaming"> </span>');
   const sp = div.querySelector('span');
@@ -716,16 +741,30 @@ async function run0() {
     if (id) { const d = await fetchML(id); S.mlData = d; mlText = fmtML(d); }
   }
 
-  const sys = `Você é especialista em análise de produtos para criação de vídeos de venda no Mercado Livre.
-REGRAS: Use APENAS os dados fornecidos. NUNCA invente. Se não souber: "NÃO CONFIRMADO". Sem promessas médicas. Sem CTA.
-Classifique: **VISÍVEL** | **INFERÊNCIA PROVÁVEL** | **NÃO CONFIRMADO**
+  const sys = `Você é especialista em comportamento de compra e análise de produtos para o Mercado Livre.
 
-Analise em Markdown:
-## 1. Descrição Real do Produto
-## 2. Comportamento de Compra
-(Perfis — mínimo 3 | Motivos de compra | Objeções)
-## 3. Ideias de Abertura (0–3s, sem fala)
-## 4. Direção do Vídeo`;
+REGRAS:
+- Use APENAS dados fornecidos (fotos, link, atributos ML). NUNCA invente.
+- Se não tiver confirmação visual: marque como "INFERÊNCIA" ou "NÃO CONFIRMADO"
+- Sem promessas médicas. Sem CTA. Sem sugestão de preço ou promoção.
+- Foco total em QUEM compra e POR QUE compra — não em como filmar.
+
+Analise em Markdown com exatamente estas seções:
+
+## 1. O Produto em Detalhes
+O que é visível, confirmado ou inferível. Características físicas, material, uso real.
+Classifique cada info: **VISÍVEL** | **INFERÊNCIA** | **NÃO CONFIRMADO**
+
+## 2. Quem Compra Este Produto
+Perfis reais (mínimo 2, máximo 4). Para cada perfil:
+- Nome do perfil e faixa etária
+- Situação de vida que o faz querer isso
+- Dor principal que sente antes de comprar
+- O que espera depois de ter o produto
+- Objeções que impedem a compra
+
+## 3. Gatilhos Emocionais
+Os 3–5 sentimentos/situações mais fortes que conectam este produto com quem vai comprar. Sem jargão de marketing — escreva como uma pessoa falaria.`;
 
   const parts = [];
   if (S.link) parts.push({ type:'text', text:'Link: '+S.link });
@@ -857,7 +896,7 @@ function html2() {
 
 function html2cfg() {
   const nOpts = [1,2,3,4].map(n=>`<span class="sel-pill${S.numTakes===n?' on':''}" onclick="setNTakes(${n})">${n} take${n>1?'s':''}</span>`).join('');
-  const tOpts = ['Dor do cliente','Descoberta','Antes e depois','Rotina real','Comparação'].map(t=>
+  const tOpts = ['Achado inesperado','Antes e depois','Teste ao vivo','Dor real resolvida','Opinião honesta','Hack de vida','Rotina real','Comparação'].map(t=>
     `<span class="sel-pill${S.tema===t?' on':''}" onclick="setTema('${t}')">${t}</span>`).join('');
   return `<div class="card">
     <div class="card-badge">Etapa 2 · Roteiro</div>
@@ -884,17 +923,30 @@ async function runEstrutura() {
   </div>`;
 
   const sys = `Você é roteirista e diretor de vídeo viral para TikTok/Reels.
-REGRAS: NUNCA "clique no link", "frete grátis", CTA. O avatar CONVERSA, não vende.
-Takes formam STORY TELLING: começo, meio e fim. Não cenas soltas.
-Vídeo ${S.videoLen==='curto'?'curto (~15s)':'completo (~30–60s)'}.
 
-Crie a ESTRUTURA de ${S.numTakes} take(s) SEM fala. Tema: ${S.tema||'livre'}.
-Para cada take:
-**TAKE X — [título]**
-- Objetivo: (o que comunica no story)
-- Ação: (o que o creator faz)
-- Câmera: (posição, movimento, enquadramento)
-TAKE 1 = hook que prende. Último take = fechamento natural.`;
+REGRAS ABSOLUTAS:
+- NUNCA "clique no link", "frete grátis", preço, CTA, escassez. Vender sem parecer que está vendendo.
+- O avatar CONVERSA como amiga fazendo uma descoberta — nunca como vendedor.
+- Takes formam STORY TELLING com começo, meio e fim. Não cenas soltas.
+
+CRÍTICO — VEO 3 GERA EXATAMENTE 8 SEGUNDOS POR TAKE:
+- A ação de cada take DEVE ser completável em 8 segundos
+- A fala deve caber em 8 segundos (~18 palavras no máximo em ritmo natural)
+- Sem ações longas ou complexas — 1 micro-momento por take
+- O creator deve estar SEMPRE em movimento usando/interagindo com o produto — NUNCA parada segurando
+
+Tema do vídeo: ${S.tema||'livre'}
+Número de takes: ${S.numTakes}
+Duração: ${S.videoLen==='curto'?'curto (~15s total = ~8s por take)':'completo (~30s total)'}
+
+Crie a ESTRUTURA de ${S.numTakes} take(s) SEM incluir a fala. Para cada take:
+
+**TAKE X — [título do momento]**
+- Objetivo: (qual emoção/ideia comunica no story)
+- Ação: (o que o creator faz COM o produto — movimento contínuo, não pose estática)
+- Câmera: (posição, ângulo, movimento — tudo para caber em 8s)
+
+TAKE 1 = hook visual que prende em 0–3s. Último take = fechamento natural com satisfação.`;
 
   try {
     const r = await stream(sys, [{role:'user',content:`Análise:\n${S.etapa0.analise.slice(0,500)}\nAvatar:\n${S.etapa1.promptAvatar.slice(0,200)}`}], document.getElementById('outEst'));
@@ -973,15 +1025,32 @@ async function runFala(takeIdx) {
   save();
   document.getElementById('stageContent').innerHTML = html2fala();
 
-  const sys = `Você é roteirista de vídeo viral para TikTok/Reels.
-REGRAS: NUNCA "clique no link", "frete grátis", CTA, slogan, frase genérica.
-Avatar CONVERSA em PT-BR. Fala: 1–3 frases completas. Estrutura: dor → percepção → benefício.
-Este é o take ${takeIdx+1} de ${S.numTakes}.
-${takeIdx===0?'É o HOOK — prende nos primeiros 3 segundos.':''}
-${takeIdx===S.numTakes-1&&S.numTakes>1?'É o FECHAMENTO — sensação de conclusão natural.':''}`;
+  const sys = `Você é roteirista de vídeo viral para TikTok/Reels. Escreve falas que parecem 100% reais.
+
+REGRAS ABSOLUTAS:
+- NUNCA: "clique no link", "frete grátis", preço, CTA, slogan, escassez, frase genérica
+- Tom: amiga contando uma descoberta para outra amiga — conversa real, não roteiro
+- CRÍTICO: Veo 3 gera 8 segundos por take. Fala MÁXIMO 18 palavras em ritmo natural de conversa
+- Cada fala deve ter 1 ideia central — não tente colocar tudo em uma fala
+- Use linguagem do dia a dia: "gente", "sério", "tipo", "olha"
+
+Este é o TAKE ${takeIdx+1} de ${S.numTakes}.
+${takeIdx===0?'HOOK: Prende nos primeiros 3 segundos. Comece com uma situação ou reação inesperada.':''}
+${takeIdx===S.numTakes-1&&S.numTakes>1?'FECHAMENTO: Sensação de descoberta concluída. Natural, sem forçar.':''}`;
 
   const prev = S.etapa2.falas.slice(0,takeIdx).filter(f=>f.escolhida).map((f,i)=>`Take ${i+1}: "${f.escolhida}"`).join('\n');
-  const prompt = `Análise:\n${S.etapa0.analise.slice(0,400)}\nEstrutura:\n${S.etapa2.estrutura.slice(0,400)}${prev?'\nFalas anteriores:\n'+prev:''}\n\nGere 3 opções de fala para o TAKE ${takeIdx+1}.\n\nOPÇÃO 1\n[fala]\n\nOPÇÃO 2\n[fala]\n\nOPÇÃO 3\n[fala]`;
+  const prompt = `Produto:\n${S.etapa0.analise.slice(0,300)}\nCena do take ${takeIdx+1}:\n${S.etapa2.estrutura.slice(0,300)}${prev?'\nFalas já aprovadas:\n'+prev:''}
+
+Gere 3 opções de fala para o TAKE ${takeIdx+1}. Máximo 18 palavras cada. Sem markdown, sem títulos, sem explicações.
+
+OPÇÃO 1
+[escreva só a fala aqui]
+
+OPÇÃO 2
+[escreva só a fala aqui]
+
+OPÇÃO 3
+[escreva só a fala aqui]`;
 
   try {
     const r = await call(sys, [{role:'user',content:prompt}]);
@@ -996,7 +1065,9 @@ ${takeIdx===S.numTakes-1&&S.numTakes>1?'É o FECHAMENTO — sensação de conclu
 }
 
 function parseFalas(text) {
-  const parts = text.split(/OPÇÃO\s*\d+/i).map(s=>s.trim()).filter(Boolean);
+  // Remove any markdown artifacts first
+  const clean = text.replace(/#{1,3}\s*[^\n]*/g,'').replace(/\*\*[^*]+\*\*/g,'').replace(/---/g,'').replace(/^\s*[\-\*]\s*/gm,'');
+  const parts = clean.split(/OPÇÃO\s*\d+/i).map(s=>s.trim()).filter(s=>s.length>5);
   return parts.length >= 2 ? parts.slice(0,3) : [text.trim()];
 }
 
@@ -1055,50 +1126,70 @@ async function run25() {
     <div class="out-body" id="out25"></div></div>
   </div>`;
 
-  const sys = `Você é um Personal Diretor sênior em vídeos virais para TikTok/Reels.
+  const sys = `Você é um Personal Diretor sênior especializado em vídeos virais para TikTok/Reels e Mercado Livre.
 Avalie o roteiro com visão crítica e objetiva.
+
+REGRAS ABSOLUTAS DA PLATAFORMA (não pode sugerir nenhum destes):
+- Sem preços, valores monetários, "R$"
+- Sem "link na bio", "acessa o link", "compra agora"
+- Sem "frete grátis", "entrega rápida", "promoção", "desconto"
+- Sem escassez artificial ("últimas unidades", "acaba amanhã")
+- A venda acontece pelo storytelling e identificação — nunca pela pressão
+
 Dê nota 0–10 para cada (formato: critério: X/10):
 - Hook: X/10
 - Naturalidade: X/10
 - Story Telling: X/10
-- Clareza: X/10
+- Clareza do Produto: X/10
 - Potencial Viral: X/10
 
 Em seguida:
-**PONTOS FORTES**
-**PONTOS FRACOS**
-**SUGESTÃO PRIORITÁRIA** (se alguma nota < 8)
-Se todas ≥ 8: "ROTEIRO APROVADO ✓"
-Se alguma < 8: termine com "Quer que eu aplique a correção?"`;
+**PONTOS FORTES** (o que está funcionando)
+**PONTOS FRACOS** (o que está travando o potencial)
+
+Se alguma nota < 8, apresente EXATAMENTE 3 alternativas de melhoria:
+**OPÇÃO A:** [descrição curta] — [nova versão do trecho]
+**OPÇÃO B:** [descrição curta] — [nova versão do trecho]
+**OPÇÃO C:** [descrição curta] — [nova versão do trecho]
+
+Se todas ≥ 8: escreva apenas "✓ ROTEIRO APROVADO"`;
 
   try {
     const r = await stream(sys, [{role:'user',content:`Roteiro:\n${S.etapa2.roteiro}\n\nProduto:\n${S.etapa0.analise.slice(0,300)}`}], document.getElementById('out25'));
     S.etapa25.avaliacao = r; S.etapa25.notas = parseNotas(r); save();
     const temFraco = Object.values(S.etapa25.notas).some(n=>n<8);
-    el.innerHTML += `<div class="approve-bar">
-      <span class="approve-label">${temFraco?'⚠️ Sugestão disponível':'✓ Diretor aprovou'}</span>
-      <div style="display:flex;gap:8px">
-        ${temFraco?`<button class="btn btn-secondary btn-sm" onclick="aplicarSugestao()">✎ Aplicar sugestão</button>`:''}
-        <button class="btn btn-primary" onclick="ok25()">→ Prompts Veo 3</button>
+    const opcoesButtons = temFraco ? `
+      <div style="margin-top:.75rem;display:flex;flex-direction:column;gap:.5rem">
+        <div style="font-size:12px;color:var(--muted);margin-bottom:.25rem">Escolha uma sugestão para aplicar:</div>
+        <button class="btn btn-secondary btn-sm" onclick="aplicarOpcao('A')">✎ Aplicar Opção A</button>
+        <button class="btn btn-secondary btn-sm" onclick="aplicarOpcao('B')">✎ Aplicar Opção B</button>
+        <button class="btn btn-secondary btn-sm" onclick="aplicarOpcao('C')">✎ Aplicar Opção C</button>
+      </div>` : '';
+    el.innerHTML += `<div class="approve-bar" style="flex-direction:column;align-items:flex-start">
+      <div style="display:flex;align-items:center;justify-content:space-between;width:100%">
+        <span class="approve-label">${temFraco?'⚠️ Sugestões disponíveis':'✓ Diretor aprovou'}</span>
+        <button class="btn btn-primary btn-sm" onclick="ok25()">→ Prompts Veo 3</button>
       </div>
+      ${opcoesButtons}
     </div>`;
   } catch(e) {
     document.getElementById('out25').innerHTML = `<div class="al-r alert">Erro: ${esc(e.message)}</div>`;
   }
 }
 
-async function aplicarSugestao() {
+async function aplicarOpcao(letra) {
   const el = document.getElementById('stageContent');
-  el.innerHTML = `<div class="card">${loadHtml('Aplicando sugestão...','Corrigindo só o ponto fraco')}</div>`;
+  el.innerHTML = `<div class="card">${loadHtml('Aplicando Opção '+letra+'...','Corrigindo o ponto indicado')}</div>`;
   try {
-    const r = await call(`Aplique APENAS a sugestão prioritária da avaliação. Não refaça tudo. Retorne o roteiro corrigido.`,
-      [{role:'user',content:`Avaliação:\n${S.etapa25.avaliacao}\n\nRoteiro:\n${S.etapa2.roteiro}`}]);
-    S.etapa2.roteiro = r; save();
+    const r = await call(`Aplique APENAS a OPÇÃO ${letra} da avaliação ao roteiro. Não altere o restante. Retorne o roteiro completo corrigido. Sem markdown desnecessário.`,
+      [{role:'user',content:`Avaliação:\n${S.etapa25.avaliacao}\n\nRoteiro atual:\n${S.etapa2.roteiro}`}]);
+    S.etapa2.roteiro = r; S.etapa25.aprovado = false; save();
     el.innerHTML = `<div class="card">
-      <div class="card-badge al-g">✓ Correção aplicada</div><div class="card-title">Roteiro corrigido</div>
+      <div class="card-badge" style="background:rgba(180,240,0,.1);color:var(--verde)">✓ Opção ${letra} aplicada</div>
+      <div class="card-title">Roteiro atualizado</div>
       <div class="out-block"><div class="out-body">${md(r)}</div></div>
       <div class="approve-bar">
-        <span class="approve-label">Aprovado após correção?</span>
+        <span class="approve-label">Ficou bom?</span>
         <div style="display:flex;gap:8px">
           <button class="btn btn-ghost btn-sm" onclick="run25()">↺ Reavaliar</button>
           <button class="btn btn-primary" onclick="ok25()">✓ Aprovado → Veo 3</button>
@@ -1143,22 +1234,42 @@ async function run3() {
     <div class="out-body" id="out3"></div></div>
   </div>`;
 
-  const sys = `Você é diretor de propaganda que transforma roteiros em prompts cinematográficos para Google Veo 3.
-REGRAS: Sempre em INGLÊS. NÃO é tradução — é direção completa.
-NÃO usar "TikTok UGC". Usar: "vertical social creator video" ou "vertical UGC-style video".
-Bloquear: watermarks, UI overlays, captions, username overlays.
-Fidelidade do produto > estética. 1 ação central por take.
-Fala em português: She says in Brazilian Portuguese: "[fala]"
+  const sys = `Você é diretor de cinema que cria prompts para Google Veo 3 — cada prompt gera exatamente 8 segundos de vídeo.
 
-Para cada take:
+REGRAS:
+- Escreva em INGLÊS — não é tradução, é direção cinematográfica completa
+- NÃO use "TikTok UGC" — use "vertical social creator video" ou "vertical UGC-style video"
+- Bloqueie sempre: No watermarks, no UI overlays, no captions, no username overlays
+- Fidelidade ao produto é prioridade — não altere cor, forma ou tamanho do produto
+- 1 ação central por take — simples e completável em 8 segundos
+- O creator SEMPRE interage ativamente com o produto — nunca parado segurando
+- Inclua a fala em português assim: She says in Brazilian Portuguese: "[fala]"
+
+CRÍTICO: Gere EXATAMENTE ${S.numTakes} prompt(s). Não mais, não menos.
+
+Para cada take use EXATAMENTE este formato (sem markdown extra, sem --- no final):
+
 PROMPT VEO 3 — TAKE X
-[prompt completo em inglês incluindo: tipo de vídeo, cena, câmera, produto no frame, expressão, iluminação, fala]`;
+[prompt completo em inglês: formato do vídeo, descrição da cena, movimento do creator com o produto, câmera, expressão, iluminação, fala]
+
+RESUMO PT-BR — TAKE X
+[2-3 linhas em português descrevendo o que deve aparecer no vídeo — para o usuário comparar com o resultado do Veo 3]`;
 
   const takes = S.etapa2.falas.map((f,i)=>`TAKE ${i+1}: "${f.escolhida}"`).join('\n');
   try {
     const r = await stream(sys, [{role:'user',content:`Roteiro:\n${S.etapa2.roteiro}\nFalas:\n${takes}\nAvatar:\n${S.etapa1.promptAvatar.slice(0,250)}\nProduto:\n${S.etapa0.analise.slice(0,250)}`}], document.getElementById('out3'));
     S.etapa3.rawText = r;
-    S.etapa3.prompts = r.split(/PROMPT VEO 3\s*[—–-]\s*TAKE\s*\d+/i).map(s=>s.trim()).filter(Boolean);
+    // Parse prompts and PT-BR summaries
+    const rawBlocks = r.split(/PROMPT VEO 3\s*[—–-]\s*TAKE\s*\d+/i).map(s=>s.trim()).filter(Boolean);
+    S.etapa3.prompts = rawBlocks.map(block => {
+      // Extract only the English prompt part (before RESUMO PT-BR)
+      const promptPart = block.split(/RESUMO PT-BR\s*[—–-]\s*TAKE\s*\d+/i)[0];
+      return promptPart.replace(/^---+\s*/,'').replace(/\s*---+$/,'').replace(/\*\*FIM[^*]*\*\*/gi,'').trim();
+    });
+    S.etapa3.resumos = rawBlocks.map(block => {
+      const parts = block.split(/RESUMO PT-BR\s*[—–-]\s*TAKE\s*\d+/i);
+      return parts[1] ? parts[1].replace(/^---+\s*/,'').replace(/\s*---+$/,'').trim() : '';
+    });
     save();
     el.innerHTML = html3res();
   } catch(e) {
@@ -1194,7 +1305,7 @@ function html3res() {
 }
 
 function ok3() { S.etapa3.aprovado=true; save(); goStage(4); }
-function refazer3() { S.etapa3={prompts:[],rawText:'',aprovado:false}; save(); run3(); }
+function refazer3() { S.etapa3={prompts:[],resumos:[],rawText:'',aprovado:false}; save(); run3(); }
 
 /* ════════════════════════════════════════
    ETAPA 4 — CAPCUT
@@ -1246,14 +1357,31 @@ async function runBlocoCC() {
   const btn = document.querySelector('#stageContent .btn-primary');
   if (btn) btn.disabled = true;
 
-  const sys = `Você é editor profissional de vídeo focado em CONVERSÃO e RETENÇÃO.
-Este NÃO é um vídeo bonito — é um vídeo que VENDE.
-Gere o guia de edição para o bloco: ${b.label} (${b.desc})
-Seja direto, prático, específico. Use marcadores. Sem enrolação.`;
+  const sys = `Você ensina edição de vídeo no CapCut para pessoas que nunca editaram nada na vida.
+A pessoa vai seguir cada passo no celular enquanto você fala. Seja o guia do lado dela.
 
-  const prev = S.etapa4.guia.map((g,idx)=>`${CC[idx].label}:\n${g}`).join('\n\n');
+REGRAS:
+- Linguagem simples, como conversa — sem termos técnicos
+- Sem EQ, compressão, codec, LUT, BPM, dB, Hz, keyframe — esses termos não existem aqui
+- Use nomes reais dos botões do CapCut: "toque em +", "arraste o controle de volume", "toque em Texto"
+- Máximo 2 linhas por passo
+- A pessoa deve terminar este bloco em menos de 10 minutos
+
+BLOCO: ${b.label}
+Objetivo: ${b.desc}
+
+Formato obrigatório:
+**${b.label}**
+
+Passo 1: [ação simples e direta]
+Passo 2: [ação simples e direta]
+[continue até concluir o bloco]
+
+✅ Pronto quando: [como saber que terminou este bloco]`;
+
+  const prev = S.etapa4.guia.map((g,idx)=>`${CC[idx].label}:\n${g.slice(0,150)}`).join('\n\n');
   try {
-    const r = await call(sys, [{role:'user',content:`Roteiro:\n${S.etapa2.roteiro.slice(0,400)}\nTakes: ${S.numTakes} | Tipo: ${S.videoLen}${prev?'\nBlocos anteriores:\n'+prev:''}`}]);
+    const r = await call(sys, [{role:'user',content:`Roteiro do vídeo:\n${S.etapa2.roteiro.slice(0,400)}\nNúmero de takes: ${S.numTakes}\nFalas: ${S.etapa2.falas.map((f,i)=>`Take ${i+1}: "${f.escolhida}"`).join(' | ')}${prev?'\nBlocos já feitos:\n'+prev:''}`}]);
     S.etapa4.guia.push(r);
     S.etapa4.blocoAtual = i+1;
     save(); renderStage();
@@ -1268,14 +1396,21 @@ function finalizarCC() { S.etapa4.aprovado=true; S.stage=9; save(); renderNav();
 /* ════════════════════════════════════════
    FINAL — KIT DE EXPORTAÇÃO
 ════════════════════════════════════════ */
+let finalTab = 'kit';
 function htmlFinal() {
   const kit = buildKit();
+  const tabKit = finalTab === 'kit';
   return `<div class="card">
     <div class="final-wrap">
       <div class="final-icon">🎬</div>
       <div class="final-title">Projeto concluído!</div>
       <div class="final-sub">Seu kit de produção está pronto. Copie e use no Veo 3 e no CapCut.</div>
     </div>
+    <div style="display:flex;gap:6px;margin-bottom:1rem">
+      <button class="btn ${tabKit?'btn-primary':'btn-ghost'} btn-sm" onclick="finalTab='kit';renderStage()">📦 Kit de Produção</button>
+      <button class="btn ${!tabKit?'btn-primary':'btn-ghost'} btn-sm" onclick="finalTab='avaliar';renderStage()">🎥 Avaliar Vídeo</button>
+    </div>
+    ${tabKit ? `
     <div class="out-block">
       <div class="out-hdr">
         <span class="out-lbl">KIT COMPLETO DE PRODUÇÃO</span>
@@ -1285,8 +1420,41 @@ function htmlFinal() {
     </div>
     <div class="btn-row" style="justify-content:center;margin-top:1.5rem">
       <button class="btn btn-ghost" onclick="reiniciar()">↺ Novo projeto</button>
-    </div>
+    </div>` : `
+    <div style="background:var(--card2);border:1px solid var(--border);border-radius:10px;padding:1.25rem">
+      <div class="card-badge">🎥 Personal Diretor — Avaliação</div>
+      <div class="card-title" style="font-size:16px;margin-bottom:.4rem">Avalie o vídeo editado</div>
+      <div class="card-sub" style="margin-bottom:1rem">Depois de editar no CapCut, descreva o resultado. O Diretor analisa e orienta para a próxima gravação.</div>
+      <label>Produto / take (opcional)</label>
+      <input type="text" id="inVideoLink" placeholder="Ex: Take 1 — faixas elásticas" style="margin-bottom:.75rem">
+      <label>O que saiu diferente do esperado?</label>
+      <textarea id="inVideoProb" rows="4" placeholder="Ex: A modelo ficou parada segurando o produto. O produto não apareceu no vídeo. A fala ficou cortada..." style="margin-bottom:.75rem"></textarea>
+      <div id="outAvalVideo" style="margin-bottom:.75rem"></div>
+      <button class="btn btn-primary" onclick="avaliarVideo()" style="width:100%;justify-content:center">🎬 Analisar com Personal Diretor</button>
+    </div>`}
   </div>`;
+}
+
+async function avaliarVideo() {
+  const prob = document.getElementById('inVideoProb')?.value.trim();
+  const link = document.getElementById('inVideoLink')?.value.trim();
+  if (!prob) { alert('Descreva o que aconteceu no vídeo.'); return; }
+  const out = document.getElementById('outAvalVideo');
+  out.innerHTML = loadHtml('Analisando...','Personal Diretor avaliando');
+  try {
+    const r = await call(
+      `Você é o Personal Diretor do ClipsFlow. Analise o problema relatado e oriente de forma simples e prática.
+REGRAS: Sem sugerir preços, "link na bio", escassez, frete ou CTA. Foco em como filmar e agir melhor.
+Formato da resposta:
+**O que aconteceu:** [explicação simples]
+**Por que aconteceu:** [causa provável]
+**Como corrigir na próxima gravação:** (lista de passos simples, sem jargão técnico)`,
+      [{role:'user',content:`Produto: ${S.etapa0.analise.slice(0,200)}\nRoteiro:\n${S.etapa2.roteiro}\nPrompt usado:\n${(S.etapa3.prompts[0]||'').slice(0,300)}\n\nProblema relatado: ${prob}${link?'\nTake/produto: '+link:''}`}]
+    );
+    out.innerHTML = `<div class="out-block"><div class="out-body">${md(r)}</div></div>`;
+  } catch(e) {
+    out.innerHTML = `<div class="al-r alert">Erro: ${esc(e.message)}</div>`;
+  }
 }
 
 function buildKit() {
