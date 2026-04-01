@@ -710,6 +710,20 @@ function salvarKey(){
   entrarNoSistema();
 }
 
+function showS(id, stepIdx){
+  const steps=['s-produto','s-analise','s-placar','s-prompts','s-takes','s-edicao','s-final'];
+  steps.forEach(s=>{
+    const el=document.getElementById(s);
+    if(el) el.style.display = (s===id)?'':'none';
+  });
+  // Atualizar nav steps
+  const navDots = document.querySelectorAll('.step-dot');
+  navDots.forEach((d,i)=>{
+    d.classList.toggle('active', i===stepIdx);
+    d.classList.toggle('done', i<stepIdx);
+  });
+}
+
 function entrarNoSistema(){
   document.getElementById('s-setup').style.display='none';
   document.getElementById('main-header').style.display='';
