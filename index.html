@@ -714,7 +714,15 @@ function showS(id, stepIdx){
   const steps=['s-produto','s-analise','s-placar','s-prompts','s-takes','s-edicao','s-final'];
   steps.forEach(s=>{
     const el=document.getElementById(s);
-    if(el) el.style.display = (s===id)?'':'none';
+    if(el){
+      if(s===id){
+        el.classList.remove('hidden');
+        el.style.display='';
+      } else {
+        el.classList.add('hidden');
+        el.style.display='none';
+      }
+    }
   });
   // Atualizar nav steps
   const navDots = document.querySelectorAll('.step-dot');
