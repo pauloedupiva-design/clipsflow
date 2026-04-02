@@ -72,10 +72,10 @@ input::placeholder,textarea::placeholder{color:#2a3f5a}
 .nav-sep{color:rgba(255,255,255,.15);font-size:9px;flex-shrink:0;padding:0 1px}
 .h-user{margin-left:auto;font-size:11px;color:rgba(255,255,255,.4);flex-shrink:0}
 .app-body{display:flex;flex:1;overflow:hidden}
-#stageWrap{flex:1;overflow-y:auto;padding:1.25rem 1.5rem}
+#stageWrap{flex:1;overflow-y:auto;padding:1rem 1.25rem}
 #stageWrap::-webkit-scrollbar{width:4px}
 #stageWrap::-webkit-scrollbar-thumb{background:var(--border);border-radius:4px}
-#stageContent{max-width:980px;margin:0 auto}
+#stageContent{width:100%}
 
 /* CHAT */
 #chatPanel{width:280px;flex-shrink:0;border-left:1px solid var(--border);display:flex;flex-direction:column;background:var(--card)}
@@ -256,6 +256,7 @@ hr{border:none;border-top:1px solid var(--border);margin:1rem 0}
     </div>
     <nav class="h-nav" id="appNav"></nav>
     <div class="h-user" id="appUser"></div>
+    <button class="btn btn-ghost btn-sm" onclick="novoProjetoHeader()" style="flex-shrink:0;font-size:11px;padding:4px 9px;margin-left:6px;color:var(--muted)">↺ Novo</button>
   </header>
   <div class="app-body">
     <div id="stageWrap">
@@ -492,14 +493,35 @@ function setMLStatus(connected) {
   document.getElementById('btnMLDes').style.display = connected ? '' : 'none';
 }
 
-function entrarApp() {
+function entrarApp(forceNew) {
   if (!S.apiKey) S.apiKey = localStorage.getItem('cf_key') || '';
+
+  // Se já há um projeto em andamento (produto analisado ou avançou etapas), oferecer escolha
+  const temProjeto = S.etapa0.analise || S.stage > 0;
+  if (temProjeto && !forceNew) {
+    const nomeEtapa = ['Produto','Avatar','Roteiro','Roteiro','Diretor','Veo 3','CapCut'][Math.min(Math.floor(S.stage),6)] || 'Etapa '+S.stage;
+    const continuar = confirm(`Você tem um projeto em andamento (${nomeEtapa}).\n\nContinuar de onde parou?\n\nOK = Continuar  |  Cancelar = Iniciar novo projeto`);
+    if (!continuar) {
+      const key = S.apiKey, ml = S.mlUser;
+      S = defaultState(); S.apiKey=key; S.mlUser=ml;
+      save();
+    }
+  }
+
   showScreen('scApp');
   const u = document.getElementById('appUser');
   if (u) u.textContent = S.mlUser ? `ML: ${S.mlUser}` : '';
   renderNav();
   renderStage();
   initChat();
+}
+
+function novoProjetoHeader() {
+  if (!confirm('Iniciar novo projeto? O projeto atual será apagado.')) return;
+  const key = S.apiKey, ml = S.mlUser;
+  S = defaultState(); S.apiKey=key; S.mlUser=ml;
+  save();
+  goStage(0);
 }
 
 /* ── UPLOAD ── */
@@ -1557,6 +1579,7 @@ function reiniciar() {
   S = defaultState(); S.apiKey=key; S.mlUser=ml;
   save(); goStage(0);
 }
+
 
 /* ════════════════════════════════════════
    INIT
