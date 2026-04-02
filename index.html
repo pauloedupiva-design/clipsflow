@@ -1098,19 +1098,22 @@ CÂMERA: [plano, ângulo e movimento para caber em 8s]
 
 OPÇÃO 1: [fala de 20-25 palavras — primeira pessoa, conversa real, tom natural]
 OPÇÃO 2: [fala de 20-25 palavras — ângulo diferente da mesma descoberta]
-OPÇÃO 3: [fala de 20-25 palavras — tom diferente, mesma cena]`;
+OPÇÃO 3: [fala de 20-25 palavras — tom diferente, mesma cena]
+
+CRÍTICO: Não use markdown, asteriscos ou formatação nas linhas OPÇÃO. Escreva exatamente: OPÇÃO 1: [texto]`;
 
   try {
     const r = await call(sys, [{role:'user', content:`Produto:\n${S.etapa0.analise.slice(0,400)}\nAvatar:\n${S.etapa1.promptAvatar.slice(0,150)}`}], MAXTOK);
 
-    // Parse structure (everything before first OPÇÃO)
-    const estrutura = r.split(/OPÇÃO\s*1:/i)[0].trim();
+    // Parse structure (everything before first OPÇÃO — handles **OPÇÃO, bold, dashes)
+    const estrutura = r.split(/\*{0,2}OPÇÃO\s*1\s*[:\-–]\*{0,2}/i)[0]
+      .replace(/\*\*\s*$/, '').replace(/---+\s*$/, '').trim();
 
-    // Parse 3 falas
+    // Parse 3 falas — handles: OPÇÃO 1:, **OPÇÃO 1:**, OPÇÃO 1 —, etc.
     const opcoes = [];
     r.split('\n').forEach(line => {
-      const m = line.match(/^OPÇÃO\s*\d+:\s*(.+)/i);
-      if (m) opcoes.push(m[1].trim().replace(/^[""]|[""]$/g, ''));
+      const m = line.match(/^\*{0,2}OPÇÃO\s*\d+\s*[:\-–]\*{0,2}\s*(.+)/i);
+      if (m) opcoes.push(m[1].trim().replace(/\*\*/g,'').replace(/^[""]|[""]$/g, ''));
     });
 
     S.etapa2.falas[idx] = {estrutura, opcoes: opcoes.slice(0,3), escolhida:'', fala:''};
