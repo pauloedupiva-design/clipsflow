@@ -199,6 +199,12 @@ input::placeholder,textarea::placeholder{color:#2a3f5a}
 @keyframes blink{0%,100%{opacity:1}50%{opacity:0}}
 
 hr{border:none;border-top:1px solid var(--border);margin:1rem 0}
+/* ── CONFIRM MODAL ── */
+#cfModal{display:none;position:fixed;inset:0;z-index:9999;background:rgba(6,15,24,.85);backdrop-filter:blur(4px);align-items:center;justify-content:center}
+#cfModal.open{display:flex}
+.cf-modal-card{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:1.75rem 1.5rem;max-width:380px;width:90%;text-align:center}
+.cf-modal-card p{font-size:14px;color:var(--text);line-height:1.65;margin-bottom:1.25rem;white-space:pre-line}
+.cf-modal-btns{display:flex;gap:8px;justify-content:center;flex-wrap:wrap}
 </style>
 </head>
 <body>
@@ -493,6 +499,19 @@ function setMLStatus(connected) {
   document.getElementById('btnMLDes').style.display = connected ? '' : 'none';
 }
 
+function showConfirm(msg, yesLabel, noLabel, onYes, onNo) {
+  const modal = document.getElementById('cfModal');
+  document.getElementById('cfModalMsg').textContent = msg;
+  const yBtn = document.getElementById('cfYes');
+  const nBtn = document.getElementById('cfNo');
+  yBtn.textContent = yesLabel;
+  nBtn.textContent = noLabel;
+  modal.classList.add('open');
+  const close = () => modal.classList.remove('open');
+  yBtn.onclick = () => { close(); onYes && onYes(); };
+  nBtn.onclick = () => { close(); onNo && onNo(); };
+}
+
 function entrarApp(forceNew) {
   if (!S.apiKey) S.apiKey = localStorage.getItem('cf_key') || '';
 
@@ -500,12 +519,14 @@ function entrarApp(forceNew) {
   const temProjeto = S.etapa0.analise || S.stage > 0;
   if (temProjeto && !forceNew) {
     const nomeEtapa = ['Produto','Avatar','Roteiro','Roteiro','Diretor','Veo 3','CapCut'][Math.min(Math.floor(S.stage),6)] || 'Etapa '+S.stage;
-    const continuar = confirm(`Você tem um projeto em andamento (${nomeEtapa}).\n\nContinuar de onde parou?\n\nOK = Continuar  |  Cancelar = Iniciar novo projeto`);
-    if (!continuar) {
-      const key = S.apiKey, ml = S.mlUser;
-      S = defaultState(); S.apiKey=key; S.mlUser=ml;
-      save();
-    }
+    showConfirm(
+      `Você tem um projeto em andamento (${nomeEtapa}).\nO que deseja fazer?`,
+      '▶ Continuar projeto',
+      '+ Iniciar novo',
+      () => { /* continuar */ showScreen('scApp'); const u=document.getElementById('appUser'); if(u)u.textContent=S.mlUser?`ML: ${S.mlUser}`:''; renderNav(); renderStage(); initChat(); },
+      () => { const key=S.apiKey,ml=S.mlUser; S=defaultState(); S.apiKey=key; S.mlUser=ml; save(); showScreen('scApp'); const u=document.getElementById('appUser'); if(u)u.textContent=S.mlUser?`ML: ${S.mlUser}`:''; renderNav(); renderStage(); initChat(); }
+    );
+    return;
   }
 
   showScreen('scApp');
@@ -517,11 +538,13 @@ function entrarApp(forceNew) {
 }
 
 function novoProjetoHeader() {
-  if (!confirm('Iniciar novo projeto? O projeto atual será apagado.')) return;
-  const key = S.apiKey, ml = S.mlUser;
-  S = defaultState(); S.apiKey=key; S.mlUser=ml;
-  save();
-  goStage(0);
+  showConfirm(
+    'Iniciar novo projeto?\nO projeto atual será apagado.',
+    'Sim, novo projeto',
+    'Cancelar',
+    () => { const key=S.apiKey,ml=S.mlUser; S=defaultState(); S.apiKey=key; S.mlUser=ml; save(); goStage(0); },
+    null
+  );
 }
 
 /* ── UPLOAD ── */
@@ -1150,7 +1173,7 @@ function concluirRoteiro() {
   S.etapa2.falas.forEach((f, i) => {
     r += `## TAKE ${i+1}\n`;
     if (f.estrutura) {
-      f.estrutura.split('\n').filter(l=>l.trim()).forEach(l => { r += l + '\n'; });
+      f.estrutura.split('\n').filter(l=>l.trim()).forEach(l => { r += l + '\n\n'; });
     }
     r += `\n**Fala:** "${f.escolhida||f.fala}"\n\n`;
   });
@@ -1577,10 +1600,13 @@ function buildKit() {
 function copyKit(btn) { copyText(buildKit(), btn); }
 
 function reiniciar() {
-  if (!confirm('Iniciar novo projeto? O progresso será perdido.')) return;
-  const key = S.apiKey, ml = S.mlUser;
-  S = defaultState(); S.apiKey=key; S.mlUser=ml;
-  save(); goStage(0);
+  showConfirm(
+    'Iniciar novo projeto?\nO progresso atual será perdido.',
+    'Sim, começar do zero',
+    'Cancelar',
+    () => { const key=S.apiKey,ml=S.mlUser; S=defaultState(); S.apiKey=key; S.mlUser=ml; save(); goStage(0); },
+    null
+  );
 }
 
 
@@ -1615,5 +1641,16 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 });
 </script>
+
+<!-- CONFIRM MODAL -->
+<div id="cfModal">
+  <div class="cf-modal-card">
+    <p id="cfModalMsg"></p>
+    <div class="cf-modal-btns">
+      <button class="btn btn-primary" id="cfYes"></button>
+      <button class="btn btn-ghost" id="cfNo"></button>
+    </div>
+  </div>
+</div>
 </body>
 </html>
